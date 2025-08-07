@@ -50,8 +50,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
   <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const firebaseConfig = {
+    // Paste your working Firebase config below
+    const firebaseConfig = {
   apiKey: "AIzaSyDY9AUUyco-stWWr3HxZ4VYDASN5JQHlAY",
   authDomain: "bingogame-ea6c9.firebaseapp.com",
   databaseURL: "https://bingogame-ea6c9-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -62,143 +62,7 @@
   measurementId: "G-ED0490QCMN"
 };
 
-      firebase.initializeApp(firebaseConfig);
-      const db = firebase.database();
-
-      let roomCode = "", nickname = "", playerId = "", totalPlayers = 0;
-      let currentTurn = 0, board = [], struckNumbers = [], playerBoards = {};
-
-      const byId = id => document.getElementById(id);
-      const qs = s => document.querySelector(s);
-
-      for (let i = 1; i <= 10; i++) {
-        const opt = document.createElement("option");
-        opt.value = i; opt.textContent = i;
-        byId("playerCount").appendChild(opt);
-      }
-
-      byId("createBtn").onclick = () => { byId("roomSelection").classList.add("hidden"); byId("createRoomDiv").classList.remove("hidden"); };
-      byId("joinBtn").onclick = () => { byId("roomSelection").classList.add("hidden"); byId("joinRoomDiv").classList.remove("hidden"); };
-
-      byId("createRoomConfirm").onclick = () => {
-        totalPlayers = parseInt(byId("playerCount").value);
-        nickname = byId("nicknameCreate").value.trim();
-        if (!nickname) return alert("Enter nickname");
-        roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
-        playerId = Date.now().toString();
-        db.ref("rooms/" + roomCode).set({
-          totalPlayers, currentTurn: 0,
-          players: { [playerId]: { nickname, board: [], strikes: [], bingo: "" } },
-          started: false
-        });
-        setupLobby();
-      };
-
-      byId("joinRoomConfirm").onclick = () => {
-        roomCode = byId("roomCodeInput").value.trim().toUpperCase();
-        nickname = byId("nicknameJoin").value.trim();
-        if (!roomCode || !nickname) return alert("Fill all fields");
-        playerId = Date.now().toString();
-        db.ref("rooms/" + roomCode).once("value", snap => {
-          if (!snap.exists()) return alert("Room not found");
-          const room = snap.val();
-          if (room.started) return alert("Game started");
-          if (Object.keys(room.players || {}).length >= room.totalPlayers) return alert("Room full");
-          db.ref("rooms/" + roomCode + "/players/" + playerId).set({ nickname, board: [], strikes: [], bingo: "" });
-          totalPlayers = room.totalPlayers;
-          setupLobby();
-        });
-      };
-
-      function setupLobby() {
-        ["createRoomDiv", "joinRoomDiv"].forEach(id => byId(id).classList.add("hidden"));
-        byId("waitingLobby").classList.remove("hidden");
-        byId("displayRoomCode").textContent = roomCode;
-        db.ref("rooms/" + roomCode + "/players").on("value", snap => {
-          const players = snap.val();
-          byId("playerList").innerHTML = "";
-          Object.values(players).forEach(p => {
-            const li = document.createElement("li");
-            li.textContent = p.nickname;
-            byId("playerList").appendChild(li);
-          });
-          if (Object.keys(players).length == totalPlayers && players[playerId]) {
-            byId("startGameBtn").classList.remove("hidden");
-          }
-        });
-        db.ref("rooms/" + roomCode + "/started").on("value", snap => {
-          if (snap.val()) loadGame();
-        });
-      }
-
-      byId("startGameBtn").onclick = () => {
-        const nums = Array.from({ length: 25 }, (_, i) => i + 1).sort(() => Math.random() - 0.5);
-        board = nums;
-        db.ref("rooms/" + roomCode + "/players/" + playerId + "/board").set(board);
-        db.ref("rooms/" + roomCode + "/started").set(true);
-      };
-
-      function loadGame() {
-        byId("waitingLobby").classList.add("hidden");
-        byId("gameSection").classList.remove("hidden");
-        db.ref("rooms/" + roomCode + "/players").on("value", snap => {
-          playerBoards = snap.val();
-          struckNumbers = playerBoards[playerId]?.strikes || [];
-          renderBoard();
-          checkWin();
-        });
-        db.ref("rooms/" + roomCode + "/currentTurn").on("value", snap => {
-          currentTurn = snap.val();
-          updateTurn();
-        });
-      }
-
-      function renderBoard() {
-        const grid = byId("bingoGrid");
-        grid.innerHTML = "";
-        board.forEach(num => {
-          const btn = document.createElement("button");
-          btn.textContent = num;
-          if (struckNumbers.includes(num)) btn.classList.add("struck");
-          btn.onclick = () => strike(num);
-          grid.appendChild(btn);
-        });
-      }
-
-      function updateTurn() {
-        const currentPlayerId = Object.keys(playerBoards)[currentTurn];
-        const name = playerBoards[currentPlayerId]?.nickname || "";
-        byId("turnInfo").textContent = "Turn: " + name;
-      }
-
-      function strike(num) {
-        if (playerId !== Object.keys(playerBoards)[currentTurn]) return alert("Not your turn!");
-        if (struckNumbers.includes(num)) return;
-        struckNumbers.push(num);
-        Object.keys(playerBoards).forEach(pid => {
-          const prev = playerBoards[pid].strikes || [];
-          db.ref("rooms/" + roomCode + "/players/" + pid + "/strikes").set([...prev, num]);
-        });
-        db.ref("rooms/" + roomCode + "/currentTurn").set((currentTurn + 1) % totalPlayers);
-      }
-
-      function checkWin() {
-        const myStrikes = playerBoards[playerId]?.strikes || [];
-        const rows = Array.from({ length: 5 }, (_, i) => board.slice(i * 5, i * 5 + 5));
-        let bingo = "";
-        rows.forEach(row => {
-          if (row.every(n => myStrikes.includes(n))) {
-            bingo += "BINGO"[bingo.length];
-          }
-        });
-        db.ref("rooms/" + roomCode + "/players/" + playerId + "/bingo").set(bingo);
-        byId("bingoProgress").textContent = "Your BINGO: " + bingo;
-        if (bingo.length === 5 && !byId("celebration").classList.contains("shown")) {
-          byId("celebration").style.display = "flex";
-          byId("celebration").classList.add("shown");
-        }
-      }
-    });
   </script>
+  <script src="https://cdn.jsdelivr.net/gh/vr-esp/bingo-firebase-sync@main/final_bingo.js"></script>
 </body>
 </html>
