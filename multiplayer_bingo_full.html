@@ -1,0 +1,204 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Multiplayer Bingo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 0; background: #f3f4f6; }
+    .container { max-width: 600px; margin: 30px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); }
+    h1 { background: linear-gradient(to right, #2575fc, #6a11cb); color: white; padding: 1rem; margin: 0 -20px 20px; }
+    .hidden { display: none; }
+    button, select, input { padding: 10px; margin: 10px; font-size: 16px; }
+    .bingo-grid { display: grid; grid-template-columns: repeat(5, 60px); gap: 5px; justify-content: center; margin: 20px 0; }
+    .bingo-grid button { height: 60px; background: #f0f0f0; border: 1px solid #ccc; font-size: 18px; border-radius: 4px; }
+    .struck { background: #ff5252 !important; color: white; }
+    .celebration { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; color: white; font-size: 3rem; display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Multiplayer Bingo</h1>
+    <div id="roomSelection">
+      <button id="createBtn">Create Room</button>
+      <button id="joinBtn">Join Room</button>
+    </div>
+    <div id="createRoomDiv" class="hidden">
+      <label>Players:</label>
+      <select id="playerCount"></select>
+      <input type="text" id="nicknameCreate" placeholder="Your nickname">
+      <button id="createRoomConfirm">Create</button>
+    </div>
+    <div id="joinRoomDiv" class="hidden">
+      <input type="text" id="roomCodeInput" placeholder="Room Code">
+      <input type="text" id="nicknameJoin" placeholder="Your nickname">
+      <button id="joinRoomConfirm">Join</button>
+    </div>
+    <div id="waitingLobby" class="hidden">
+      <h3>Room Code: <span id="displayRoomCode"></span></h3>
+      <ul id="playerList"></ul>
+      <button id="startGameBtn" class="hidden">Start Game</button>
+    </div>
+    <div id="gameSection" class="hidden">
+      <h3 id="turnInfo"></h3>
+      <div class="bingo-grid" id="bingoGrid"></div>
+      <div id="bingoProgress"></div>
+    </div>
+  </div>
+  <div class="celebration" id="celebration">🎉 BINGO! 🎉</div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const firebaseConfig = {
+  apiKey: "AIzaSyDY9AUUyco-stWWr3HxZ4VYDASN5JQHlAY",
+  authDomain: "bingogame-ea6c9.firebaseapp.com",
+  databaseURL: "https://bingogame-ea6c9-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "bingogame-ea6c9",
+  storageBucket: "bingogame-ea6c9.firebasestorage.app",
+  messagingSenderId: "553263162615",
+  appId: "1:553263162615:web:b20e3feb6d282a3f3b9ff2",
+  measurementId: "G-ED0490QCMN"
+};
+
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.database();
+
+      let roomCode = "", nickname = "", playerId = "", totalPlayers = 0;
+      let currentTurn = 0, board = [], struckNumbers = [], playerBoards = {};
+
+      const byId = id => document.getElementById(id);
+      const qs = s => document.querySelector(s);
+
+      for (let i = 1; i <= 10; i++) {
+        const opt = document.createElement("option");
+        opt.value = i; opt.textContent = i;
+        byId("playerCount").appendChild(opt);
+      }
+
+      byId("createBtn").onclick = () => { byId("roomSelection").classList.add("hidden"); byId("createRoomDiv").classList.remove("hidden"); };
+      byId("joinBtn").onclick = () => { byId("roomSelection").classList.add("hidden"); byId("joinRoomDiv").classList.remove("hidden"); };
+
+      byId("createRoomConfirm").onclick = () => {
+        totalPlayers = parseInt(byId("playerCount").value);
+        nickname = byId("nicknameCreate").value.trim();
+        if (!nickname) return alert("Enter nickname");
+        roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+        playerId = Date.now().toString();
+        db.ref("rooms/" + roomCode).set({
+          totalPlayers, currentTurn: 0,
+          players: { [playerId]: { nickname, board: [], strikes: [], bingo: "" } },
+          started: false
+        });
+        setupLobby();
+      };
+
+      byId("joinRoomConfirm").onclick = () => {
+        roomCode = byId("roomCodeInput").value.trim().toUpperCase();
+        nickname = byId("nicknameJoin").value.trim();
+        if (!roomCode || !nickname) return alert("Fill all fields");
+        playerId = Date.now().toString();
+        db.ref("rooms/" + roomCode).once("value", snap => {
+          if (!snap.exists()) return alert("Room not found");
+          const room = snap.val();
+          if (room.started) return alert("Game started");
+          if (Object.keys(room.players || {}).length >= room.totalPlayers) return alert("Room full");
+          db.ref("rooms/" + roomCode + "/players/" + playerId).set({ nickname, board: [], strikes: [], bingo: "" });
+          totalPlayers = room.totalPlayers;
+          setupLobby();
+        });
+      };
+
+      function setupLobby() {
+        ["createRoomDiv", "joinRoomDiv"].forEach(id => byId(id).classList.add("hidden"));
+        byId("waitingLobby").classList.remove("hidden");
+        byId("displayRoomCode").textContent = roomCode;
+        db.ref("rooms/" + roomCode + "/players").on("value", snap => {
+          const players = snap.val();
+          byId("playerList").innerHTML = "";
+          Object.values(players).forEach(p => {
+            const li = document.createElement("li");
+            li.textContent = p.nickname;
+            byId("playerList").appendChild(li);
+          });
+          if (Object.keys(players).length == totalPlayers && players[playerId]) {
+            byId("startGameBtn").classList.remove("hidden");
+          }
+        });
+        db.ref("rooms/" + roomCode + "/started").on("value", snap => {
+          if (snap.val()) loadGame();
+        });
+      }
+
+      byId("startGameBtn").onclick = () => {
+        const nums = Array.from({ length: 25 }, (_, i) => i + 1).sort(() => Math.random() - 0.5);
+        board = nums;
+        db.ref("rooms/" + roomCode + "/players/" + playerId + "/board").set(board);
+        db.ref("rooms/" + roomCode + "/started").set(true);
+      };
+
+      function loadGame() {
+        byId("waitingLobby").classList.add("hidden");
+        byId("gameSection").classList.remove("hidden");
+        db.ref("rooms/" + roomCode + "/players").on("value", snap => {
+          playerBoards = snap.val();
+          struckNumbers = playerBoards[playerId]?.strikes || [];
+          renderBoard();
+          checkWin();
+        });
+        db.ref("rooms/" + roomCode + "/currentTurn").on("value", snap => {
+          currentTurn = snap.val();
+          updateTurn();
+        });
+      }
+
+      function renderBoard() {
+        const grid = byId("bingoGrid");
+        grid.innerHTML = "";
+        board.forEach(num => {
+          const btn = document.createElement("button");
+          btn.textContent = num;
+          if (struckNumbers.includes(num)) btn.classList.add("struck");
+          btn.onclick = () => strike(num);
+          grid.appendChild(btn);
+        });
+      }
+
+      function updateTurn() {
+        const currentPlayerId = Object.keys(playerBoards)[currentTurn];
+        const name = playerBoards[currentPlayerId]?.nickname || "";
+        byId("turnInfo").textContent = "Turn: " + name;
+      }
+
+      function strike(num) {
+        if (playerId !== Object.keys(playerBoards)[currentTurn]) return alert("Not your turn!");
+        if (struckNumbers.includes(num)) return;
+        struckNumbers.push(num);
+        Object.keys(playerBoards).forEach(pid => {
+          const prev = playerBoards[pid].strikes || [];
+          db.ref("rooms/" + roomCode + "/players/" + pid + "/strikes").set([...prev, num]);
+        });
+        db.ref("rooms/" + roomCode + "/currentTurn").set((currentTurn + 1) % totalPlayers);
+      }
+
+      function checkWin() {
+        const myStrikes = playerBoards[playerId]?.strikes || [];
+        const rows = Array.from({ length: 5 }, (_, i) => board.slice(i * 5, i * 5 + 5));
+        let bingo = "";
+        rows.forEach(row => {
+          if (row.every(n => myStrikes.includes(n))) {
+            bingo += "BINGO"[bingo.length];
+          }
+        });
+        db.ref("rooms/" + roomCode + "/players/" + playerId + "/bingo").set(bingo);
+        byId("bingoProgress").textContent = "Your BINGO: " + bingo;
+        if (bingo.length === 5 && !byId("celebration").classList.contains("shown")) {
+          byId("celebration").style.display = "flex";
+          byId("celebration").classList.add("shown");
+        }
+      }
+    });
+  </script>
+</body>
+</html>
