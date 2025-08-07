@@ -1,4 +1,14 @@
+Sure! Below is your **corrected and complete HTML + JavaScript script** for the multiplayer Bingo game. This version fixes the issue where the second player’s game would crash due to a missing board. Now the board is stored centrally in Firebase and shared with all players.
 
+---
+
+> ✅ **IMPORTANT:** Replace `/* your Firebase config here */` with your actual Firebase configuration object (`apiKey`, `authDomain`, `databaseURL`, etc.).
+
+---
+
+### ✅ **Full HTML + JavaScript Script (Corrected Version)**
+
+```html
 <!DOCTYPE html>
 <html>
 <head>
@@ -23,35 +33,44 @@
       <button id="createBtn">Create Room</button>
       <button id="joinBtn">Join Room</button>
     </div>
+
     <div id="createRoomDiv" class="hidden">
       <label>Players:</label>
       <select id="playerCount"></select>
       <input type="text" id="nicknameCreate" placeholder="Your nickname">
       <button id="createRoomConfirm">Create</button>
     </div>
+
     <div id="joinRoomDiv" class="hidden">
       <input type="text" id="roomCodeInput" placeholder="Room Code">
       <input type="text" id="nicknameJoin" placeholder="Your nickname">
       <button id="joinRoomConfirm">Join</button>
     </div>
+
     <div id="waitingLobby" class="hidden">
       <h3>Room Code: <span id="displayRoomCode"></span></h3>
       <ul id="playerList"></ul>
       <button id="startGameBtn" class="hidden">Start Game</button>
     </div>
+
     <div id="gameSection" class="hidden">
       <h3 id="turnInfo"></h3>
       <div class="bingo-grid" id="bingoGrid"></div>
       <div id="bingoProgress"></div>
     </div>
   </div>
+
   <div class="celebration" id="celebration">🎉 BINGO! 🎉</div>
 
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+
   <script>
-    // Paste your working Firebase config below
-    const firebaseConfig = {
+    document.addEventListener("DOMContentLoaded", function () {
+
+      // 🔧 Replace with your actual Firebase config
+     const firebaseConfig = {
   apiKey: "AIzaSyDY9AUUyco-stWWr3HxZ4VYDASN5JQHlAY",
   authDomain: "bingogame-ea6c9.firebaseapp.com",
   databaseURL: "https://bingogame-ea6c9-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -62,7 +81,121 @@
   measurementId: "G-ED0490QCMN"
 };
 
-  </script>
-  <script src="https://cdn.jsdelivr.net/gh/vr-esp/bingo-firebase-sync@main/final_bingo.js"></script>
-</body>
-</html>
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.database();
+
+      let roomCode = "", nickname = "", playerId = "", totalPlayers = 0;
+      let currentTurn = 0, board = [], struckNumbers = [], playerBoards = {};
+
+      const byId = id => document.getElementById(id);
+
+      for (let i = 1; i <= 10; i++) {
+        const opt = document.createElement("option");
+        opt.value = i; opt.textContent = i;
+        byId("playerCount").appendChild(opt);
+      }
+
+      byId("createBtn").onclick = () => {
+        byId("roomSelection").classList.add("hidden");
+        byId("createRoomDiv").classList.remove("hidden");
+      };
+
+      byId("joinBtn").onclick = () => {
+        byId("roomSelection").classList.add("hidden");
+        byId("joinRoomDiv").classList.remove("hidden");
+      };
+
+      byId("createRoomConfirm").onclick = () => {
+        totalPlayers = parseInt(byId("playerCount").value);
+        nickname = byId("nicknameCreate").value.trim();
+        if (!nickname) return alert("Enter nickname");
+        roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+        playerId = Date.now().toString();
+        db.ref("rooms/" + roomCode).set({
+          totalPlayers,
+          currentTurn: 0,
+          players: {
+            [playerId]: { nickname, board: [], strikes: [], bingo: "" }
+          },
+          started: false
+        });
+        setupLobby();
+      };
+
+      byId("joinRoomConfirm").onclick = () => {
+        roomCode = byId("roomCodeInput").value.trim().toUpperCase();
+        nickname = byId("nicknameJoin").value.trim();
+        if (!roomCode || !nickname) return alert("Fill all fields");
+        playerId = Date.now().toString();
+        db.ref("rooms/" + roomCode).once("value", snap => {
+          if (!snap.exists()) return alert("Room not found");
+          const room = snap.val();
+          if (room.started) return alert("Game started");
+          if (Object.keys(room.players || {}).length >= room.totalPlayers) return alert("Room full");
+          db.ref("rooms/" + roomCode + "/players/" + playerId).set({ nickname, board: [], strikes: [], bingo: "" });
+          totalPlayers = room.totalPlayers;
+          setupLobby();
+        });
+      };
+
+      function setupLobby() {
+        ["createRoomDiv", "joinRoomDiv"].forEach(id => byId(id).classList.add("hidden"));
+        byId("waitingLobby").classList.remove("hidden");
+        byId("displayRoomCode").textContent = roomCode;
+
+        db.ref("rooms/" + roomCode + "/players").on("value", snap => {
+          const players = snap.val();
+          byId("playerList").innerHTML = "";
+          Object.values(players).forEach(p => {
+            const li = document.createElement("li");
+            li.textContent = p.nickname;
+            byId("playerList").appendChild(li);
+          });
+          if (Object.keys(players).length === totalPlayers && players[playerId]) {
+            byId("startGameBtn").classList.remove("hidden");
+          }
+        });
+
+        db.ref("rooms/" + roomCode + "/started").on("value", snap => {
+          if (snap.val()) loadGame();
+        });
+      }
+
+      byId("startGameBtn").onclick = () => {
+        const nums = Array.from({ length: 25 }, (_, i) => i + 1).sort(() => Math.random() - 0.5);
+        db.ref("rooms/" + roomCode + "/board").set(nums);
+        db.ref("rooms/" + roomCode + "/started").set(true);
+      };
+
+      function loadGame() {
+        byId("waitingLobby").classList.add("hidden");
+        byId("gameSection").classList.remove("hidden");
+
+        db.ref("rooms/" + roomCode + "/board").on("value", snap => {
+          board = snap.val() || [];
+          renderBoard();
+          checkWin();
+        });
+
+        db.ref("rooms/" + roomCode + "/players").on("value", snap => {
+          playerBoards = snap.val() || {};
+          struckNumbers = playerBoards[playerId]?.strikes || [];
+          renderBoard();
+          checkWin();
+        });
+
+        db.ref("rooms/" + roomCode + "/currentTurn").on("value", snap => {
+          currentTurn = snap.val();
+          updateTurn();
+        });
+      }
+
+      function renderBoard() {
+        const grid = byId("bingoGrid");
+        grid.innerHTML = "";
+        if (!board || board.length !== 25) return;
+        board.forEach(num => {
+          const btn = document.createElement("button");
+          btn.textContent = num;
+         
+```
