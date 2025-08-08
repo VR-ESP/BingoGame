@@ -31,11 +31,15 @@
   .bingo-letter.hit{opacity:1;transform:scale(1.06);transition:.2s ease}
 
   /* Board */
-  .board{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:10px auto 6px;max-width:360px}
+  .board-wrap{position:relative;width:fit-content;margin:10px auto 6px}
+  .board{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;max-width:340px}
   .cell{aspect-ratio:1/1;border-radius:50%;display:flex;align-items:center;justify-content:center;
-        background:#ffffff;border:1px solid var(--line2);color:#111;font-weight:800;font-size:16px;user-select:none;cursor:pointer}
-  .cell input{width:100%;height:100%;border:0;background:transparent;text-align:center;color:#111;font-weight:800;font-size:16px;border-radius:50%}
+        background:#ffffff;border:1px solid var(--line2);color:#111;font-weight:800;font-size:15px;user-select:none;cursor:pointer}
+  .cell input{width:100%;height:100%;border:0;background:transparent;text-align:center;color:#111;font-weight:800;font-size:15px;border-radius:50%}
   .cell.struck{color:#111}
+  #lineOverlay{position:absolute;inset:0;pointer-events:none}
+  .strike-line{position:absolute;background:#111;opacity:.55;border-radius:3px}
+
   .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line2);border-radius:999px;padding:6px 12px;background:#fff}
   .dot{width:12px;height:12px;border-radius:50%}
   .title{font-weight:800;margin:2px 0 4px}
@@ -47,37 +51,28 @@
   @keyframes glow{50%{box-shadow:0 0 0 12px rgba(37,99,235,0)}}
 
   /* Winner toast + confetti */
-  .toast{
-    position:fixed; top:-200px; left:0; right:0; z-index:9999;
-    display:flex; justify-content:center; pointer-events:none;
-  }
-  .toast-inner{
-    background:#ffffff; border:1px solid var(--line2); border-radius:12px;
+  .toast{position:fixed; top:-200px; left:0; right:0; z-index:9999; display:flex; justify-content:center; pointer-events:none}
+  .toast-inner{background:#ffffff; border:1px solid var(--line2); border-radius:12px;
     padding:12px 16px; margin-top:12px; box-shadow:0 12px 30px rgba(0,0,0,.12);
-    font-weight:800; color:#111; display:flex; align-items:center; gap:10px;
-  }
+    font-weight:800; color:#111; display:flex; align-items:center; gap:10px;}
   .toast.show{animation:slideDown .5s ease forwards}
   .toast.hide{animation:slideUp .4s ease forwards}
   @keyframes slideDown{from{top:-200px;opacity:.2}to{top:0;opacity:1}}
   @keyframes slideUp{from{top:0;opacity:1}to{top:-200px;opacity:0}}
 
-  .confetti{
-    position:fixed; top:-20px; left:0; width:100%; height:0; pointer-events:none; overflow:visible; z-index:9998;
-  }
+  .confetti{position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; overflow:visible; z-index:9998}
   .confetti i{
-    position:absolute; top:-20px; width:8px; height:12px; opacity:.95; transform:rotate(0deg);
-    animation:fall 1.6s linear forwards;
-    border-radius:2px;
+    position:absolute; top:-30px; width:8px; height:12px; opacity:.95; border-radius:2px;
+    animation:fall linear forwards;
   }
   @keyframes fall{
-    to{ transform:translateY(220px) rotate(180deg); opacity:.9; }
+    to{ transform:translateY(110vh) rotate(240deg); opacity:.9; }
   }
 </style>
 </head>
 <body>
-<div class="toast" id="toast">
-  <div class="toast-inner" id="toastText">🎉 Player won!</div>
-</div>
+<!-- global top toast & confetti -->
+<div class="toast" id="toast"><div class="toast-inner" id="toastText">🎉 Player won!</div></div>
 <div class="confetti" id="confetti"></div>
 
 <div class="wrap">
@@ -138,13 +133,9 @@
 
     <!-- Lobby -->
     <div id="step-lobby" class="hidden">
-      <div class="pill" style="margin-bottom:8px">
-        <span class="mini">Room</span>&nbsp;<b id="roomCodeLabel"></b>
-      </div>
-
+      <div class="pill" style="margin-bottom:8px"><span class="mini">Room</span>&nbsp;<b id="roomCodeLabel"></b></div>
       <div class="title">Players</div>
       <div id="players" class="center" style="margin-bottom:6px"></div>
-
       <div class="hr"></div>
 
       <div class="title">Your Board</div>
@@ -153,14 +144,10 @@
         <button id="manualFill">Manual Entry</button>
       </div>
       <div id="boardBuilder" class="board" style="margin-top:8px"></div>
-      <div class="center">
-        <button id="readyBtn" class="primary hidden">I’m Ready</button>
-      </div>
+      <div class="center"><button id="readyBtn" class="primary hidden">I’m Ready</button></div>
 
       <div class="hr"></div>
-      <div class="center">
-        <button id="startBtn" class="primary glow hidden">Start Game</button>
-      </div>
+      <div class="center"><button id="startBtn" class="primary glow hidden">Start Game</button></div>
       <div class="mini center" style="margin-top:2px">Anyone can start after <b>everyone</b> is ready.</div>
     </div>
 
@@ -170,7 +157,12 @@
         <div class="pill"><span class="mini">Turn:</span>&nbsp;<b id="turnName">-</b></div>
         <div class="pill"><span class="mini">You:</span>&nbsp;<span id="youDot" class="dot"></span>&nbsp;<b id="youName"></b></div>
       </div>
-      <div id="gameBoard" class="board"></div>
+
+      <!-- board wrap for strike overlay -->
+      <div class="board-wrap">
+        <div id="gameBoard" class="board"></div>
+        <div id="lineOverlay"></div>
+      </div>
 
       <div id="winnersBox" class="winners hidden" style="margin-top:10px">
         <div class="title">Winners</div>
@@ -208,7 +200,7 @@ let numbersStruck = {};       // num -> pid
 let currentTurnIndex = 0;
 let winnersObj = {};          // pid -> {name,rank}
 let gameOver = false;
-let seenWinnerPids = new Set(); // toasts only once per winner
+let seenWinnerPids = new Set();
 
 /* ============ 3) Helpers ============ */
 const $ = id => document.getElementById(id);
@@ -216,11 +208,7 @@ const show = id => $(id).classList.remove("hidden");
 const hide = id => $(id).classList.add("hidden");
 const code = ()=>Math.random().toString(36).substring(2,7).toUpperCase();
 
-function toRGBA(hex, a=0.28){
-  const h = hex.replace("#","");
-  const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
-  return `rgba(${r},${g},${b},${a})`;
-}
+function toRGBA(hex, a=0.28){ const h=hex.replace("#",""); const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16); return `rgba(${r},${g},${b},${a})`; }
 function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
 function linesFromBoard(b){
   const rows = [0,1,2,3,4].map(r=>b.slice(r*5, r*5+5));
@@ -232,25 +220,20 @@ function linesFromBoard(b){
 
 /* ===== winner toast & confetti ===== */
 function showWinnerToast(text){
-  const toast = $("toast");
-  const tx = $("toastText");
+  const toast = $("toast"), tx = $("toastText");
   tx.textContent = text;
-  toast.classList.remove("hide");
-  toast.classList.add("show");
+  toast.classList.remove("hide"); toast.classList.add("show");
   makeConfetti();
-  setTimeout(()=>{
-    toast.classList.remove("show");
-    toast.classList.add("hide");
-  }, 2200);
+  setTimeout(()=>{ toast.classList.remove("show"); toast.classList.add("hide"); }, 2400);
 }
 function makeConfetti(){
   const c = $("confetti"); c.innerHTML = "";
   const colors = ["#ef4444","#f59e0b","#10b981","#3b82f6","#a855f7","#22d3ee"];
-  for(let i=0;i<60;i++){
+  for(let i=0;i<120;i++){
     const piece = document.createElement("i");
-    piece.style.left = Math.random()*100 + "%";
+    piece.style.left = Math.random()*100 + "vw";
     piece.style.background = colors[i%colors.length];
-    piece.style.animationDelay = (Math.random()*0.6)+"s";
+    piece.style.animationDuration = (1.6 + Math.random()*1.2) + "s";
     piece.style.transform = `translateY(0) rotate(${Math.random()*180}deg)`;
     c.appendChild(piece);
   }
@@ -279,8 +262,7 @@ $("joinGo").onclick = async ()=>{
   if(!nickname || !room) return alert("Enter nickname and room code.");
   const r = db.ref(`rooms/${room}`); const s = await r.get();
   if(!s.exists()) return alert("Room not found.");
-  const orderSnap = await db.ref(`rooms/${room}/order`).get();
-  const ord = orderSnap.val() || [];
+  const orderSnap = await db.ref(`rooms/${room}/order`).get(); const ord = orderSnap.val() || [];
   my = { pid:"p"+Date.now(), name:nickname, color:PASTEL[ord.length % PASTEL.length], room, board:[], ready:false };
   await db.ref(`rooms/${room}/order`).set([...ord, my.pid]);
   await db.ref(`rooms/${room}/players/${my.pid}`).set({ nickname, color:my.color, ready:false, board:[], rank:null, finished:false, bingoCount:0 });
@@ -292,20 +274,11 @@ function enterLobby(){
   hide("step-create"); hide("step-join"); show("step-lobby");
   $("roomCodeLabel").textContent = my.room;
 
-  db.ref(`rooms/${my.room}/players`).on("value", snap=>{
-    players = snap.val() || {};
-    renderPlayers(); updateStartVisibility();
-  });
-  db.ref(`rooms/${my.room}/order`).on("value", snap=>{
-    order = snap.val() || [];
-    renderPlayers(); updateStartVisibility();
-  });
-  db.ref(`rooms/${my.room}/started`).on("value", snap=>{
-    if(snap.val()===true){ startGameUI(); }
-  });
+  db.ref(`rooms/${my.room}/players`).on("value", snap=>{ players = snap.val() || {}; renderPlayers(); updateStartVisibility(); });
+  db.ref(`rooms/${my.room}/order`).on("value", snap=>{ order = snap.val() || []; renderPlayers(); updateStartVisibility(); });
+  db.ref(`rooms/${my.room}/started`).on("value", snap=>{ if(snap.val()===true){ startGameUI(); } });
 
-  $("boardBuilder").innerHTML = "";
-  hide("readyBtn");
+  $("boardBuilder").innerHTML = ""; hide("readyBtn");
   $("autoFill").disabled = false; $("manualFill").disabled = false;
 }
 
@@ -338,11 +311,9 @@ function buildBoardInputs(vals, locked){
   const host = $("boardBuilder"); host.innerHTML = "";
   vals.forEach((v)=>{
     const cell = document.createElement("div"); cell.className="cell";
-    if(locked){
-      cell.textContent = v;
-    }else{
-      const input = document.createElement("input");
-      input.type="text"; input.maxLength=2; input.placeholder="";
+    if(locked){ cell.textContent = v; }
+    else{
+      const input = document.createElement("input"); input.type="text"; input.maxLength=2; input.placeholder="";
       input.oninput = ()=>{ input.value = input.value.replace(/[^0-9]/g,""); };
       cell.appendChild(input);
     }
@@ -388,29 +359,24 @@ function startGameUI(){
   });
   db.ref(`rooms/${my.room}/numbers/struck`).on("value", async s=>{
     numbersStruck = s.val() || {};
-    paintBoard();
-    await autoCheckWinFromUpdate();      // if someone else’s click wins me, rank me now
+    paintBoard();                // paint cells
+    updateMyBannerAndLines();    // banner + row/col/diag strike lines
+    await autoCheckWinFromUpdate();
   });
   db.ref(`rooms/${my.room}/winners`).on("value", s=>{
     const before = new Set(Object.keys(winnersObj||{}));
     winnersObj = s.val() || {};
     renderWinners();
-
-    // detect new winners to toast
     const after = new Set(Object.keys(winnersObj));
     for(const pid of after){
       if(!before.has(pid) && !seenWinnerPids.has(pid)){
         const w = winnersObj[pid];
         const name = (players[pid]?.nickname || w.name || "A player");
         showWinnerToast(`🎉 ${name} got BINGO! Rank ${w.rank}`);
+        // if 2 players → also say Game Over, then scroll
+        if(order.length===2){ setTimeout(()=>{ showWinnerToast("🏁 Game Over"); }, 900); setTimeout(()=>{ $("winnersBox").scrollIntoView({behavior:"smooth",block:"start"});}, 1100); }
         seenWinnerPids.add(pid);
       }
-    }
-
-    // if exactly 2 players and at least 1 winner → end and scroll
-    if(order.length === 2 && Object.keys(winnersObj).length >= 1){
-      db.ref(`rooms/${my.room}/gameOver`).set(true);
-      setTimeout(()=>{ document.getElementById("winnersBox").scrollIntoView({behavior:"smooth", block:"start"}); }, 800);
     }
   });
   db.ref(`rooms/${my.room}/gameOver`).on("value", s=>{
@@ -446,13 +412,48 @@ function paintBoard(){
       c.style.borderColor = "#d1d5db";
     }
   });
+}
 
-  // update my banner letters
+function updateMyBannerAndLines(){
   const struck = new Set(Object.keys(numbersStruck).map(n=>parseInt(n,10)));
   const lines = linesFromBoard(my.board);
-  let done = 0; lines.forEach(line=>{ if(line.every(n=>struck.has(n))) done++; });
+  let done = 0; const completed = [];
+  // rows 0-4, cols 5-9, diag indices 10,11 for identification
+  for(let i=0;i<5;i++){ const row = lines[i]; if(row.every(n=>struck.has(n))){ done++; completed.push({type:'row',idx:i}); } }
+  for(let i=5;i<10;i++){ const col = lines[i]; if(col.every(n=>struck.has(n))){ done++; completed.push({type:'col',idx:i-5}); } }
+  if(lines[10].every(n=>struck.has(n))){ done++; completed.push({type:'d1'}); }
+  if(lines[11].every(n=>struck.has(n))){ done++; completed.push({type:'d2'}); }
+
   for(let i=0;i<5;i++){ const el=$("L"+i); if(i<done) el.classList.add("hit"); else el.classList.remove("hit"); }
   db.ref(`rooms/${my.room}/players/${my.pid}/bingoCount`).set(done);
+
+  // draw strike lines
+  const overlay = $("lineOverlay"); overlay.innerHTML = "";
+  const thickness = 3; // px
+  completed.forEach(c=>{
+    const line = document.createElement("div");
+    line.className = "strike-line";
+    if(c.type==="row"){
+      const y = ((c.idx + 0.5) / 5) * 100;
+      line.style.left = "0"; line.style.width = "100%"; line.style.height = thickness+"px";
+      line.style.top = `calc(${y}% - ${thickness/2}px)`;
+    }else if(c.type==="col"){
+      const x = ((c.idx + 0.5) / 5) * 100;
+      line.style.top = "0"; line.style.height = "100%"; line.style.width = thickness+"px";
+      line.style.left = `calc(${x}% - ${thickness/2}px)`;
+    }else if(c.type==="d1"){
+      // main diagonal
+      line.style.width = "140%"; line.style.height = thickness+"px";
+      line.style.left = "-20%"; line.style.top = "calc(50% - 1.5px)";
+      line.style.transform = "rotate(45deg)";
+    }else if(c.type==="d2"){
+      // anti diagonal
+      line.style.width = "140%"; line.style.height = thickness+"px";
+      line.style.left = "-20%"; line.style.top = "calc(50% - 1.5px)";
+      line.style.transform = "rotate(-45deg)";
+    }
+    overlay.appendChild(line);
+  });
 }
 
 function disableBoard(){
@@ -469,7 +470,6 @@ async function advanceTurn(){
     const pSnap = await db.ref(`rooms/${my.room}/players/${pid}/finished`).get();
     if(!pSnap.val()) { await db.ref(`rooms/${my.room}/currentTurn`).set(idx); return; }
   }
-  // everyone finished → end game
   await db.ref(`rooms/${my.room}/gameOver`).set(true);
 }
 
@@ -484,15 +484,9 @@ async function tryStrike(num){
   let assigned = false;
   await ref.transaction(current=>{
     if(current) return current;
-    assigned = true;
-    return my.pid;
+    assigned = true; return my.pid;
   });
   if(!assigned) return;
-
-  await handlePostStrikeLogic();
-}
-
-async function handlePostStrikeLogic(){
   await advanceTurn();
 }
 
@@ -509,7 +503,6 @@ async function autoCheckWinFromUpdate(){
   if(me.finished) return;
 
   if(done >= 5){
-    // transactional, idempotent ranking
     const rankRef = db.ref(`rooms/${my.room}/nextRank`);
     let assigned;
     await rankRef.transaction(cur => { cur = cur || 1; assigned = cur; return cur + 1; });
@@ -520,14 +513,12 @@ async function autoCheckWinFromUpdate(){
       await db.ref(`rooms/${my.room}/winners/${my.pid}`).set({ name: my.name, rank: assigned });
     }
 
-    // if exactly 2 players → end game and scroll
     if(order.length === 2){
       await db.ref(`rooms/${my.room}/gameOver`).set(true);
-      setTimeout(()=>{ document.getElementById("winnersBox").scrollIntoView({behavior:"smooth", block:"start"}); }, 800);
+      setTimeout(()=>{ $("winnersBox").scrollIntoView({behavior:"smooth", block:"start"}); }, 900);
     }
   }
 
-  // end if all finished
   const playersSnap = await db.ref(`rooms/${my.room}/players`).get();
   const data = playersSnap.val() || {};
   const finishedCount = Object.values(data).filter(p=>p.finished).length;
