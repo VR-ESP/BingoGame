@@ -1,56 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Multiplayer Bingo</title>
-
 <style>
   :root{
-    --bg:#0f1020; --card:#17182b; --ink:#e8e8ff; --muted:#a8acd9;
-    --accent1:#ff4757; --accent2:#1e90ff; --accent3:#2ed573; --accent4:#ffa502;
-    --accent5:#B620E0; --accent6:#00d1b2; --accent7:#ff66c4; --accent8:#6eff8d;
+    --bg:#ffffff; --card:#ffffff; --ink:#111; --muted:#6b7280;
+    --line:#e5e7eb; --line2:#d1d5db; --btn:#2563eb; --btnTxt:#fff;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:linear-gradient(135deg,#141531,#0a0b19 70%);color:var(--ink);font:16px/1.4 system-ui,Segoe UI,Arial,sans-serif}
-  .wrap{max-width:980px;margin:28px auto;padding:16px}
-  .card{background:var(--card);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:18px}
-  h1{margin:0 0 16px;background:linear-gradient(90deg,#6a11cb,#2575fc);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:34px;font-weight:800;text-align:center}
-  .center{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
-  button, input[type=text]{border:0;border-radius:10px;padding:12px 16px;font-weight:700}
-  button{background:#2b2e53;color:#fff;cursor:pointer;transition:transform .05s ease,filter .15s ease}
-  button:hover{filter:brightness(1.1)}
-  button:active{transform:scale(.98)}
-  input[type=text]{width:100%;background:#1d1f3f;color:#fff}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,Segoe UI,Roboto,Arial,sans-serif}
+  .wrap{max-width:980px;margin:24px auto;padding:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 6px 24px rgba(0,0,0,.06)}
+  h1{margin:4px 0 14px;font-weight:800;text-align:center;font-size:32px;
+     background:linear-gradient(90deg,#2563eb,#7c3aed);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .center{display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .hidden{display:none !important}
 
-  /* Lobby */
-  .pill{display:inline-flex;align-items:center;gap:8px;background:#101233;border:1px solid #2a2c5a;border-radius:999px;padding:6px 12px;margin:6px 8px 0 0}
-  .dot{width:12px;height:12px;border-radius:50%}
+  button{border:1px solid var(--line2);background:#f8fafc;border-radius:10px;padding:10px 14px;
+         cursor:pointer;font-weight:700;color:#111}
+  button.primary{background:var(--btn);border-color:var(--btn);color:var(--btnTxt)}
+  button:disabled{opacity:.6;cursor:not-allowed}
+  input[type=text]{width:100%;border:1px solid var(--line2);border-radius:10px;padding:10px;background:#fff;color:#111}
 
-  /* BINGO banner */
-  .bingo-banner{margin:10px auto 4px;display:flex;justify-content:center;gap:8px;letter-spacing:6px}
-  .bingo-letter{font-size:42px;font-weight:900;filter:drop-shadow(0 3px 8px rgba(0,0,0,.35));opacity:.35}
-  .bingo-letter.hit{opacity:1;transform:scale(1.08);animation:pulse .5s ease}
-  @keyframes pulse{from{transform:scale(0.8);opacity:.4}to{transform:scale(1.08);opacity:1}}
+  /* Banner BINGO */
+  .bingo-banner{margin:2px auto 10px;display:flex;justify-content:center;gap:10px;letter-spacing:6px}
+  .bingo-letter{font-size:40px;font-weight:900;opacity:.28}
+  .bingo-letter.hit{opacity:1;transform:scale(1.06);transition:.2s ease}
 
   /* Board */
-  .board{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:18px auto 8px;max-width:420px}
+  .board{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:12px auto 8px;max-width:460px}
   .cell{aspect-ratio:1/1;border-radius:50%;display:flex;align-items:center;justify-content:center;
-        background:#131437;border:1px solid #2a2c5a;color:#cfd3ff;font-size:18px;font-weight:800;cursor:pointer;user-select:none;transition:transform .06s ease, background .2s ease}
-  .cell:hover{transform:translateY(-1px)}
-  .cell.struck{color:#fff;border-color:transparent;box-shadow:0 0 0 2px rgba(255,255,255,.08) inset, 0 5px 18px rgba(0,0,0,.35)}
-  .cell input{width:100%;height:100%;border:0;background:transparent;text-align:center;color:#cfd3ff;font-weight:800;font-size:18px;border-radius:50%}
+        background:#ffffff;border:1px solid var(--line2);color:#111;font-weight:800;font-size:18px;user-select:none;cursor:pointer}
+  .cell input{width:100%;height:100%;border:0;background:transparent;text-align:center;color:#111;font-weight:800;font-size:18px;border-radius:50%}
+  .cell.struck{color:#111}
+  .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line2);border-radius:999px;padding:6px 12px;background:#fff}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .title{font-weight:800;margin:2px 0 4px}
+  .hr{height:1px;background:var(--line);margin:14px 0;border-radius:1px}
   .mini{font-size:12px;color:var(--muted)}
 
-  .title{font-weight:800;margin:6px 0 2px}
-  .section{margin:16px auto}
-  .hr{height:1px;background:#2a2c5a;margin:14px 0;border-radius:1px}
-
-  .winner{background:#101233;border:1px solid #2a2c5a;border-radius:10px;padding:8px 12px;margin-top:8px}
-  .glow{animation:glow 1.4s ease-in-out infinite alternate}
-  @keyframes glow{from{text-shadow:0 0 10px rgba(255,255,255,.15)}to{text-shadow:0 0 26px rgba(255,255,255,.45)}}
+  .winners{border:1px solid var(--line2);border-radius:10px;padding:10px 12px;background:#fff}
+  .glow{box-shadow:0 0 0 0 rgba(37,99,235,.6);animation:glow 1.2s ease-in-out infinite}
+  @keyframes glow{50%{box-shadow:0 0 0 12px rgba(37,99,235,0)}}
 </style>
 </head>
 <body>
@@ -61,19 +55,17 @@
 
     <!-- Big colorful BINGO -->
     <div id="banner" class="bingo-banner hidden">
-      <span class="bingo-letter" id="L0" style="color:#ff5d7d">B</span>
-      <span class="bingo-letter" id="L1" style="color:#ffd166">I</span>
-      <span class="bingo-letter" id="L2" style="color:#06d6a0">N</span>
-      <span class="bingo-letter" id="L3" style="color:#118ab2">G</span>
-      <span class="bingo-letter" id="L4" style="color:#c77dff">O</span>
+      <span class="bingo-letter" id="L0" style="color:#ef4444">B</span>
+      <span class="bingo-letter" id="L1" style="color:#f59e0b">I</span>
+      <span class="bingo-letter" id="L2" style="color:#10b981">N</span>
+      <span class="bingo-letter" id="L3" style="color:#3b82f6">G</span>
+      <span class="bingo-letter" id="L4" style="color:#a855f7">O</span>
     </div>
 
-    <!-- Entry step -->
-    <div id="step-choose" class="section">
-      <div class="center">
-        <button id="btnCreate">Create Room</button>
-        <button id="btnJoin">Join Room</button>
-      </div>
+    <!-- Choose -->
+    <div id="step-choose" class="center" style="margin:8px 0 6px">
+      <button id="btnCreate" class="primary">Create Room</button>
+      <button id="btnJoin">Join Room</button>
     </div>
 
     <!-- Create -->
@@ -81,15 +73,15 @@
       <div class="row">
         <div>
           <div class="title">Your Nickname</div>
-          <input id="createName" type="text" placeholder="e.g., Vasanth" />
+          <input id="createName" type="text" placeholder="e.g., Vasanth"/>
         </div>
         <div>
           <div class="title">Room Code</div>
-          <input id="createCode" type="text" readonly />
+          <input id="createCode" type="text" readonly/>
         </div>
       </div>
-      <div class="center">
-        <button id="createGo">Create & Enter Lobby</button>
+      <div class="center" style="margin-top:8px">
+        <button id="createGo" class="primary">Create & Enter Lobby</button>
         <button id="back1">Back</button>
       </div>
     </div>
@@ -99,76 +91,69 @@
       <div class="row">
         <div>
           <div class="title">Your Nickname</div>
-          <input id="joinName" type="text" placeholder="e.g., Arjun" />
+          <input id="joinName" type="text" placeholder="e.g., Arjun"/>
         </div>
         <div>
           <div class="title">Room Code</div>
-          <input id="joinCode" type="text" placeholder="ABCDE" />
+          <input id="joinCode" type="text" placeholder="ABCDE"/>
         </div>
       </div>
-      <div class="center">
-        <button id="joinGo">Join Lobby</button>
+      <div class="center" style="margin-top:8px">
+        <button id="joinGo" class="primary">Join Lobby</button>
         <button id="back2">Back</button>
       </div>
     </div>
 
     <!-- Lobby -->
-    <div id="step-lobby" class="section hidden">
-      <div class="title">Room</div>
-      <div class="pill"><span class="mini">Code:</span>&nbsp;<strong id="roomCodeLabel"></strong></div>
-      <div class="hr"></div>
+    <div id="step-lobby" class="hidden">
+      <div class="pill" style="margin-bottom:8px">
+        <span class="mini">Room</span>&nbsp;<b id="roomCodeLabel"></b>
+      </div>
 
       <div class="title">Players</div>
-      <div id="players" class="center"></div>
+      <div id="players" class="center" style="margin-bottom:6px"></div>
 
       <div class="hr"></div>
 
       <div class="title">Your Board</div>
-      <div class="center" style="gap:8px">
+      <div class="center">
         <button id="autoFill">Auto Fill 1–25</button>
         <button id="manualFill">Manual Entry</button>
       </div>
-
-      <!-- Board builder -->
-      <div id="boardBuilder" class="board"></div>
+      <div id="boardBuilder" class="board" style="margin-top:8px"></div>
       <div class="center">
-        <button id="readyBtn" class="hidden">I’m Ready</button>
+        <button id="readyBtn" class="primary hidden">I’m Ready</button>
       </div>
 
       <div class="hr"></div>
-
       <div class="center">
-        <button id="startBtn" class="hidden glow">Start Game</button>
+        <button id="startBtn" class="primary glow hidden">Start Game</button>
       </div>
-      <div class="mini">The game can start after <b>all players</b> press “I’m Ready”.</div>
+      <div class="mini center" style="margin-top:2px">Anyone can start after <b>everyone</b> is ready.</div>
     </div>
 
     <!-- Game -->
-    <div id="step-game" class="section hidden">
-      <div class="center">
-        <div class="pill"><span class="mini">Turn:</span> <b id="turnName">-</b></div>
-        <div class="pill"><span class="mini">You:</span> <span id="youPill" class="dot"></span><b id="youName"></b></div>
+    <div id="step-game" class="hidden">
+      <div class="center" style="margin-bottom:6px">
+        <div class="pill"><span class="mini">Turn:</span>&nbsp;<b id="turnName">-</b></div>
+        <div class="pill"><span class="mini">You:</span>&nbsp;<span id="youDot" class="dot"></span>&nbsp;<b id="youName"></b></div>
       </div>
-
       <div id="gameBoard" class="board"></div>
 
-      <div id="winners" class="winner hidden">
+      <div id="winnersBox" class="winners hidden" style="margin-top:10px">
         <div class="title">Winners</div>
-        <ol id="winnerList"></ol>
+        <ol id="winnerList" style="margin:6px 0 0 20px"></ol>
       </div>
     </div>
 
   </div>
 </div>
 
-<!-- Firebase compat (works on GH Pages) -->
+<!-- Firebase compat -->
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
-
 <script>
-/* =========================
-   🔧 1) Firebase Config
-   ========================= */
+/* ============ 1) Firebase Config (replace) ============ */
 const firebaseConfig = {
   apiKey: "AIzaSyDY9AUUyco-stWWr3HxZ4VYDASN5JQHlAY",
   authDomain: "bingogame-ea6c9.firebaseapp.com",
@@ -182,58 +167,104 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-/* =========================
-   ⚙️ 2) State & Constants
-   ========================= */
-const COLORS = [
-  "#ff4757","#1e90ff","#2ed573","#ffa502","#B620E0","#00d1b2","#ff66c4","#6eff8d",
-  "#ffd166","#118ab2"
-];
-
-let my = {
-  pid: null,
-  name: "",
-  color: "",
-  room: "",
-  board: [],        // my 25 numbers
-  ready: false
-};
-let players = {};        // pid -> { nickname,color,ready,board,rank,finished }
-let numbersStruck = {};  // num -> pid who struck it
+/* ============ 2) State ============ */
+const PASTEL = ["#ff6b6b","#60a5fa","#34d399","#fbbf24","#a78bfa","#22d3ee","#f472b6","#86efac"];
+const COLORS = PASTEL; // lighter palette
+let my = { pid:null, name:"", color:"", room:"", board:[], ready:false };
+let players = {};              // pid -> player
+let order = [];                // join order
+let numbersStruck = {};        // num -> pid
 let currentTurnIndex = 0;
-let order = [];          // array of pids (join order)
-let winners = [];        // [{pid,rank,name}]
+let winnersObj = {};           // pid -> {name,rank}
 
-/* =========================
-   🧭 3) Helpers
-   ========================= */
+/* ============ 3) Helpers ============ */
 const $ = (id)=>document.getElementById(id);
-const show = (id)=>$(id).classList.remove("hidden");
-const hide = (id)=>$(id).classList.add("hidden");
-const rngCode = ()=>Math.random().toString(36).substring(2,7).toUpperCase();
+const show = id => $(id).classList.remove("hidden");
+const hide = id => $(id).classList.add("hidden");
+const code = ()=>Math.random().toString(36).substring(2,7).toUpperCase();
 
-function shuffle(arr){
-  for(let i=arr.length-1;i>0;i--){
-    const j = Math.floor(Math.random()*(i+1));
-    [arr[i],arr[j]]=[arr[j],arr[i]];
-  }
-  return arr;
+function toRGBA(hex, a=0.28){
+  // #rrggbb → rgba(r,g,b,a)
+  const h = hex.replace("#","");
+  const r=parseInt(h.substring(0,2),16), g=parseInt(h.substring(2,4),16), b=parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+const linesFromBoard = (b) => {
+  const rows = [0,1,2,3,4].map(r=>b.slice(r*5, r*5+5));
+  const cols = [0,1,2,3,4].map(c=>[b[c],b[c+5],b[c+10],b[c+15],b[c+20]]);
+  const d1 = [b[0],b[6],b[12],b[18],b[24]];
+  const d2 = [b[4],b[8],b[12],b[16],b[20]];
+  return [...rows, ...cols, d1, d2]; // ✅ diagonals included (no extra array)
+};
+
+/* ============ 4) UI navigation ============ */
+$("btnCreate").onclick = ()=>{ hide("step-choose"); show("step-create"); $("createCode").value = code(); };
+$("btnJoin").onclick   = ()=>{ hide("step-choose"); show("step-join"); };
+$("back1").onclick = ()=>{ hide("step-create"); show("step-choose"); };
+$("back2").onclick = ()=>{ hide("step-join"); show("step-choose"); };
+
+/* ============ 5) Create / Join ============ */
+$("createGo").onclick = async ()=>{
+  const nickname = $("createName").value.trim();
+  const room = $("createCode").value.trim().toUpperCase();
+  if(!nickname || !room) return alert("Enter nickname and room code.");
+  my = { pid:"p"+Date.now(), name:nickname, color:COLORS[0], room, board:[], ready:false };
+  await db.ref(`rooms/${room}`).set({ createdAt:Date.now(), started:false, currentTurn:0, order:[my.pid], nextRank:1 });
+  await db.ref(`rooms/${room}/players/${my.pid}`).set({ nickname, color:my.color, ready:false, board:[], rank:null, finished:false, bingoCount:0 });
+  enterLobby();
+};
+
+$("joinGo").onclick = async ()=>{
+  const nickname = $("joinName").value.trim();
+  const room = $("joinCode").value.trim().toUpperCase();
+  if(!nickname || !room) return alert("Enter nickname and room code.");
+  const r = db.ref(`rooms/${room}`);
+  const s = await r.get();
+  if(!s.exists()) return alert("Room not found.");
+  const orderSnap = await db.ref(`rooms/${room}/order`).get();
+  const ord = orderSnap.val() || [];
+  my = { pid:"p"+Date.now(), name:nickname, color:COLORS[ord.length % COLORS.length], room, board:[], ready:false };
+  await db.ref(`rooms/${room}/order`).set([...ord, my.pid]);
+  await db.ref(`rooms/${room}/players/${my.pid}`).set({ nickname, color:my.color, ready:false, board:[], rank:null, finished:false, bingoCount:0 });
+  enterLobby();
+};
+
+/* ============ 6) Lobby & Board setup ============ */
+function enterLobby(){
+  hide("step-create"); hide("step-join"); show("step-lobby");
+  $("roomCodeLabel").textContent = my.room;
+
+  db.ref(`rooms/${my.room}/players`).on("value", snap=>{
+    players = snap.val() || {};
+    renderPlayers();
+    updateStartVisibility();
+  });
+  db.ref(`rooms/${my.room}/order`).on("value", snap=>{
+    order = snap.val() || [];
+    renderPlayers();
+    updateStartVisibility();
+  });
+  db.ref(`rooms/${my.room}/started`).on("value", snap=>{
+    if(snap.val()===true){ startGameUI(); }
+  });
+
+  // reset builder
+  $("boardBuilder").innerHTML = "";
+  hide("readyBtn");
+  $("autoFill").disabled = false;
+  $("manualFill").disabled = false;
 }
 
 function renderPlayers(){
-  const wrap = $("players");
-  wrap.innerHTML = "";
+  const c = $("players"); c.innerHTML="";
   order.forEach(pid=>{
-    const p = players[pid];
-    if(!p) return;
+    const p = players[pid]; if(!p) return;
     const el = document.createElement("div");
     el.className="pill";
-    el.innerHTML = `<span class="dot" style="background:${p.color}"></span>
-                    <b>${p.nickname}</b> ${
-                      p.ready ? '<span class="mini" style="color:#6eff8d">&nbsp;READY</span>' :
-                                '<span class="mini">&nbsp;not ready</span>'
-                    }`;
-    wrap.appendChild(el);
+    el.innerHTML = `<span class="dot" style="background:${p.color}"></span><b>${p.nickname}</b>${p.ready?' <span class="mini" style="color:#10b981">&nbsp;READY</span>':' <span class="mini">&nbsp;not ready</span>'}`;
+    c.appendChild(el);
   });
 }
 
@@ -242,318 +273,179 @@ function updateStartVisibility(){
   if(allReady) show("startBtn"); else hide("startBtn");
 }
 
-/* =========================
-   🧑‍💻 4) UI: Step wiring
-   ========================= */
-$("btnCreate").addEventListener("click",()=>{
-  hide("step-choose"); show("step-create");
-  $("createCode").value = rngCode();
-});
-$("btnJoin").addEventListener("click",()=>{
-  hide("step-choose"); show("step-join");
-});
-$("back1").onclick = ()=>{ hide("step-create"); show("step-choose"); };
-$("back2").onclick = ()=>{ hide("step-join"); show("step-choose"); };
-
-/* =========================
-   🏠 5) Create / Join room
-   ========================= */
-$("createGo").addEventListener("click", async ()=>{
-  const nickname = $("createName").value.trim();
-  const room = $("createCode").value.trim().toUpperCase();
-  if(!nickname || !room) return alert("Enter nickname and room code.");
-
-  my.pid = "p" + Date.now();
-  my.name = nickname;
-  my.room = room;
-
-  // initialize room
-  const roomRef = db.ref(`rooms/${room}`);
-  await roomRef.set({
-    createdAt: Date.now(),
-    started: false,
-    currentTurn: 0,
-    order: [my.pid],
-    nextRank: 1
-  });
-
-  // add me
-  const color = COLORS[0];
-  my.color = color;
-  await db.ref(`rooms/${room}/players/${my.pid}`).set({
-    nickname, color, ready:false, board:[], rank:null, finished:false
-  });
-
-  enterLobby();
-});
-
-$("joinGo").addEventListener("click", async ()=>{
-  const nickname = $("joinName").value.trim();
-  const room = $("joinCode").value.trim().toUpperCase();
-  if(!nickname || !room) return alert("Enter nickname and room code.");
-
-  const roomRef = db.ref(`rooms/${room}`);
-  const snap = await roomRef.get();
-  if(!snap.exists()) return alert("Room not found.");
-
-  my.pid = "p" + Date.now();
-  my.name = nickname;
-  my.room = room;
-
-  // read current order to decide color index
-  const orderSnap = await db.ref(`rooms/${room}/order`).get();
-  const orderVal = orderSnap.val() || [];
-  const color = COLORS[orderVal.length % COLORS.length];
-  my.color = color;
-
-  // append me to order & players
-  await db.ref(`rooms/${room}/order`).set([...orderVal, my.pid]);
-  await db.ref(`rooms/${room}/players/${my.pid}`).set({
-    nickname, color, ready:false, board:[], rank:null, finished:false
-  });
-
-  enterLobby();
-});
-
-/* =========================
-   🛗 6) Lobby & Board setup
-   ========================= */
-function enterLobby(){
-  hide("step-create"); hide("step-join"); show("step-lobby");
-  $("roomCodeLabel").innerText = my.room;
-  // show my color tag on “You”
-  $("youPill").style.background = my.color;
-  $("youName").textContent = my.name;
-
-  // listeners
-  db.ref(`rooms/${my.room}/players`).on("value", snap=>{
-    players = snap.val() || {};
-    renderPlayers();
-    updateStartVisibility();
-  });
-
-  db.ref(`rooms/${my.room}/order`).on("value", snap=>{
-    order = snap.val() || [];
-    renderPlayers();
-  });
-
-  db.ref(`rooms/${my.room}/started`).on("value", snap=>{
-    if(snap.val()===true){ startGameUI(); }
-  });
-
-  // board builders
-  $("boardBuilder").innerHTML = "";
-  hide("readyBtn");
-  ["autoFill","manualFill"].forEach(id=>$(id).disabled=false);
-}
-
-$("autoFill").addEventListener("click", ()=>{
+$("autoFill").onclick = ()=>{
   my.board = shuffle(Array.from({length:25},(_,i)=>i+1));
   buildBoardInputs(my.board,true);
   show("readyBtn");
-});
-
-$("manualFill").addEventListener("click", ()=>{
+};
+$("manualFill").onclick = ()=>{
   buildBoardInputs(Array(25).fill(""),false);
   show("readyBtn");
-});
+};
 
-function buildBoardInputs(values, locked){
-  const host = $("boardBuilder");
-  host.innerHTML = "";
-  values.forEach((val,idx)=>{
-    const cell = document.createElement("div");
-    cell.className = "cell";
-    if(locked){
-      cell.textContent = val;
-    }else{
-      const input = document.createElement("input");
-      input.type="text"; input.maxLength=2; input.placeholder= (idx+1);
-      input.value = val? String(val):"";
+function buildBoardInputs(vals, locked){
+  const host = $("boardBuilder"); host.innerHTML = "";
+  vals.forEach((v,i)=>{
+    const cell = document.createElement("div"); cell.className="cell";
+    if(locked){ cell.textContent = v; }
+    else{
+      const input = document.createElement("input"); input.type="text"; input.maxLength=2; input.placeholder=String(i+1);
       input.oninput = ()=>{ input.value = input.value.replace(/[^0-9]/g,""); };
       cell.appendChild(input);
     }
     host.appendChild(cell);
   });
-  // lock control
-  $("autoFill").disabled = locked;
-  $("manualFill").disabled = locked;
+  $("autoFill").disabled = locked; $("manualFill").disabled = locked;
 }
 
-$("readyBtn").addEventListener("click", async ()=>{
-  // if manual, collect & validate
+$("readyBtn").onclick = async ()=>{
   if(my.board.length!==25){
     const inputs = Array.from($("boardBuilder").querySelectorAll("input"));
     const vals = inputs.map(i=>parseInt(i.value,10));
-    if(vals.some(v=>!Number.isInteger(v) || v<1 || v>25)) return alert("Enter numbers 1–25 only.");
-    if(new Set(vals).size!==25) return alert("Numbers must be unique 1–25.");
+    if(vals.some(v=>!Number.isInteger(v) || v<1 || v>25)) return alert("Enter numbers 1–25.");
+    if(new Set(vals).size!==25) return alert("Numbers must be unique (1–25).");
     my.board = vals;
   }
   await db.ref(`rooms/${my.room}/players/${my.pid}/board`).set(my.board);
   await db.ref(`rooms/${my.room}/players/${my.pid}/ready`).set(true);
-  $("readyBtn").textContent = "Ready ✓";
-  $("readyBtn").disabled = true;
-});
+  $("readyBtn").textContent = "Ready ✓"; $("readyBtn").disabled = true;
+};
 
-$("startBtn").addEventListener("click", async ()=>{
-  // only allow after all ready (UI guards too)
-  const everyoneReady = order.every(pid=>players[pid]?.ready);
-  if(!everyoneReady) return alert("All players are not ready yet.");
-  await db.ref(`rooms/${my.room}/numbers/struck`).set(null);      // clear previous
+$("startBtn").onclick = async ()=>{
+  const allReady = order.every(pid=>players[pid]?.ready);
+  if(!allReady) return alert("All players must be ready.");
+  await db.ref(`rooms/${my.room}/numbers/struck`).set(null);
+  await db.ref(`rooms/${my.room}/winners`).set(null);
+  await db.ref(`rooms/${my.room}/nextRank`).set(1);
   await db.ref(`rooms/${my.room}/started`).set(true);
   await db.ref(`rooms/${my.room}/currentTurn`).set(0);
-});
+};
 
-/* =========================
-   🎮 7) In-game UI & Logic
-   ========================= */
+/* ============ 7) Game ============ */
 function startGameUI(){
   hide("step-lobby"); show("step-game"); show("banner");
-
-  // render my board grid for tapping
+  $("youDot").style.background = my.color; $("youName").textContent = my.name;
   renderGameBoard();
 
-  // turn & numbers listeners
-  db.ref(`rooms/${my.room}/currentTurn`).on("value", snap=>{
-    currentTurnIndex = snap.val() ?? 0;
-    const pid = (order[currentTurnIndex] || "");
+  db.ref(`rooms/${my.room}/currentTurn`).on("value", s=>{
+    currentTurnIndex = s.val() ?? 0;
+    const pid = order[currentTurnIndex] || "";
     $("turnName").textContent = players[pid]?.nickname || "-";
   });
-
-  db.ref(`rooms/${my.room}/numbers/struck`).on("value", snap=>{
-    numbersStruck = snap.val() || {};
-    paintBoard();                 // paint my board with colors
-    recomputeMyBingo();           // update my BINGO banner
+  db.ref(`rooms/${my.room}/numbers/struck`).on("value", s=>{
+    numbersStruck = s.val() || {};
+    paintBoard();
+    updateMyBingo();
   });
-
-  // winners
-  db.ref(`rooms/${my.room}/winners`).on("value", snap=>{
-    const list = snap.val() || [];
-    winners = list;
+  db.ref(`rooms/${my.room}/winners`).on("value", s=>{
+    winnersObj = s.val() || {};
     renderWinners();
   });
 }
 
 function renderGameBoard(){
-  const host = $("gameBoard");
-  host.innerHTML = "";
+  const host = $("gameBoard"); host.innerHTML = "";
   my.board.forEach(num=>{
     const cell = document.createElement("div");
-    cell.className = "cell";
-    cell.dataset.num = num;
-    cell.textContent = num;
-    cell.addEventListener("click", ()=>tryStrike(num));
+    cell.className="cell"; cell.dataset.num = num; cell.textContent = num;
+    cell.onclick = ()=>tryStrike(num);
     host.appendChild(cell);
   });
   paintBoard();
 }
 
 function paintBoard(){
-  // for each cell, if number was struck, color by striker color
   const cells = Array.from($("gameBoard").children);
   cells.forEach(c=>{
     const num = parseInt(c.dataset.num,10);
-    if(numbersStruck && numbersStruck[num]){
-      const strikerPid = numbersStruck[num];
-      const color = players[strikerPid]?.color || "#888";
+    const striker = numbersStruck[num];
+    if(striker){
+      const color = players[striker]?.color || "#999";
       c.classList.add("struck");
-      c.style.background = color;
-    } else {
+      c.style.background = toRGBA(color, 0.28);      /* lighter fill */
+      c.style.borderColor = color;                   /* thin colored ring */
+    }else{
       c.classList.remove("struck");
-      c.style.background = "#131437";
+      c.style.background = "#fff";
+      c.style.borderColor = "#d1d5db";
     }
   });
 }
 
 async function tryStrike(num){
-  // enforce turns
   const myIndex = order.indexOf(my.pid);
   if(myIndex !== currentTurnIndex) return alert("Not your turn!");
 
-  // write with a transaction so two users can't strike same number
   const ref = db.ref(`rooms/${my.room}/numbers/struck/${num}`);
-  ref.transaction(current=>{
-    if(current) return current;   // already taken, abort
-    return my.pid;                // claim by me
-  }, async (err, committed)=>{
-    if(err) { console.error(err); return; }
-    if(!committed){ return; } // someone else was faster
-
-    // advance turn
-    const next = (currentTurnIndex + 1) % order.length;
-    await db.ref(`rooms/${my.room}/currentTurn`).set(next);
-
-    // after numbers update arrives, everyone will repaint and recompute bingo
-    // also check if *I* finished 5 lines to award rank
-    setTimeout(checkAndRankIfWon, 0);
+  let assigned = false;
+  await ref.transaction(current=>{
+    if(current) return current;     // already taken
+    assigned = true;
+    return my.pid;
   });
+  if(!assigned) return; // someone else beat you
+
+  // advance turn
+  const next = (currentTurnIndex + 1) % order.length;
+  await db.ref(`rooms/${my.room}/currentTurn`).set(next);
+
+  // if this made me win, rank me
+  await maybeAssignRank();
 }
 
-/* =========================
-   🅱️ 8) BINGO logic per player
-   ========================= */
-function recomputeMyBingo(){
-  const struckNums = new Set(Object.keys(numbersStruck).map(n=>parseInt(n,10)));
+/* BINGO banner update for me */
+function updateMyBingo(){
+  const struck = new Set(Object.keys(numbersStruck).map(n=>parseInt(n,10)));
   const lines = linesFromBoard(my.board);
-  let completed = 0;
-  lines.forEach(line=>{
-    if(line.every(n=>struckNums.has(n))) completed++;
+  let done = 0; lines.forEach(line=>{ if(line.every(n=>struck.has(n))) done++; });
+  for(let i=0;i<5;i++){ const el=$("L"+i); if(i<done) el.classList.add("hit"); else el.classList.remove("hit"); }
+  db.ref(`rooms/${my.room}/players/${my.pid}/bingoCount`).set(done);
+}
+
+/* Transactional, idempotent ranking */
+async function maybeAssignRank(){
+  // if I'm already finished, bail
+  const meSnap = await db.ref(`rooms/${my.room}/players/${my.pid}`).get();
+  const me = meSnap.val();
+  if(me?.finished) return;
+
+  // check lines >=5
+  const struck = new Set(Object.keys(numbersStruck).map(n=>parseInt(n,10)));
+  const lines = linesFromBoard(my.board);
+  let done = 0; lines.forEach(line=>{ if(line.every(n=>struck.has(n))) done++; });
+  if(done < 5) return;
+
+  // claim a rank exactly once
+  const rankRef = db.ref(`rooms/${my.room}/nextRank`);
+  let assigned;
+  await rankRef.transaction(cur=>{
+    cur = cur || 1;
+    assigned = cur;
+    return cur + 1;
   });
-  // update banner letters for me locally (visual)
-  for(let i=0;i<5;i++){
-    const el = $("L"+i);
-    if(i < completed) el.classList.add("hit"); else el.classList.remove("hit");
-  }
-  // also mirror my completion to DB so others can see ranking progress quickly
-  db.ref(`rooms/${my.room}/players/${my.pid}/bingoCount`).set(completed);
-}
 
-function linesFromBoard(b){
-  // rows, cols, diags
-  const rows = [0,1,2,3,4].map(r=>b.slice(r*5, r*5+5));
-  const cols = [0,1,2,3,4].map(c=>[b[c],b[c+5],b[c+10],b[c+15],b[c+20]]);
-  const d1 = [b[0],b[6],b[12],b[18],b[24]];
-  const d2 = [b[4],b[8],b[12],b[16],b[20]];
-  return [...rows,...cols,[d1],[d2]];
-}
+  // Double-check if someone already set my rank between reads
+  const check = await db.ref(`rooms/${my.room}/players/${my.pid}/rank`).get();
+  if(check.exists()) return; // already set (idempotent guard)
 
-async function checkAndRankIfWon(){
-  // compute for me again in case others’ strikes counted
-  const struckNums = new Set(Object.keys(numbersStruck).map(n=>parseInt(n,10)));
-  const lines = linesFromBoard(my.board);
-  let completed = 0;
-  lines.forEach(line=>{ if(line.every(n=>struckNums.has(n))) completed++; });
+  await db.ref(`rooms/${my.room}/players/${my.pid}`).update({ rank: assigned, finished: true });
 
-  if(completed >= 5){
-    // give me a rank using a transaction on nextRank
-    const rankRef = db.ref(`rooms/${my.room}/nextRank`);
-    rankRef.transaction(current=>{
-      if(!current) current = 1;
-      const assigned = current;
-      // write winners list entry & my player rank
-      db.ref(`rooms/${my.room}/winners`).get().then(s=>{
-        const arr = s.val() || [];
-        arr.push({pid: my.pid, name: my.name, rank: assigned});
-        db.ref(`rooms/${my.room}/winners`).set(arr);
-      });
-      db.ref(`rooms/${my.room}/players/${my.pid}/rank`).set(assigned);
-      db.ref(`rooms/${my.room}/players/${my.pid}/finished`).set(true);
-      return current + 1;
-    });
-  }
+  // winners as an object keyed by pid → no duplicates
+  await db.ref(`rooms/${my.room}/winners/${my.pid}`).set({ name: my.name, rank: assigned });
 }
 
 function renderWinners(){
-  const box = $("winners");
-  const list = $("winnerList");
-  list.innerHTML = "";
-  (winners||[]).sort((a,b)=>a.rank-b.rank).forEach(w=>{
+  const box = $("winnersBox");
+  const list = $("winnerList"); list.innerHTML = "";
+  const entries = Object.entries(winnersObj).map(([pid,v])=>({pid, ...v}));
+  entries.sort((a,b)=>a.rank-b.rank);
+  entries.forEach(w=>{
     const li = document.createElement("li");
     const color = players[w.pid]?.color || "#999";
-    li.innerHTML = `<span class="dot" style="background:${color};margin-right:8px"></span><b>${w.name}</b> — Rank ${w.rank}`;
+    li.innerHTML = `<span class="dot" style="background:${color};display:inline-block;margin-right:8px"></span><b>${w.name}</b> — Rank ${w.rank}`;
     list.appendChild(li);
   });
-  if((winners||[]).length>0) show("winners");
+  if(entries.length>0) show("winnersBox");
 }
 </script>
 </body>
