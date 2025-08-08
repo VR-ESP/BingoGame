@@ -30,15 +30,18 @@
   .bingo-letter{font-size:40px;font-weight:900;opacity:.28}
   .bingo-letter.hit{opacity:1;transform:scale(1.06);transition:.2s ease}
 
-  /* Board */
+  /* Boards: consistent 70px circles with nice spacing */
+  .board{display:grid;grid-template-columns:repeat(5, 70px);gap:12px;justify-content:center}
+  .board .cell{width:70px;height:70px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+        background:#ffffff;border:1px solid var(--line2);color:#111;font-weight:800;font-size:16px;user-select:none;cursor:pointer}
+  .board .cell input{width:100%;height:100%;border:0;background:transparent;text-align:center;color:#111;
+        font-weight:800;font-size:16px;border-radius:50%}
+  .board .cell.struck{color:#111}
+
+  /* Game strike overlay lines */
   .board-wrap{position:relative;width:fit-content;margin:10px auto 6px}
-  .board{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;max-width:340px}
-  .cell{aspect-ratio:1/1;border-radius:50%;display:flex;align-items:center;justify-content:center;
-        background:#ffffff;border:1px solid var(--line2);color:#111;font-weight:800;font-size:15px;user-select:none;cursor:pointer}
-  .cell input{width:100%;height:100%;border:0;background:transparent;text-align:center;color:#111;font-weight:800;font-size:15px;border-radius:50%}
-  .cell.struck{color:#111}
   #lineOverlay{position:absolute;inset:0;pointer-events:none}
-  .strike-line{position:absolute;background:#111;opacity:.55;border-radius:3px}
+  .strike-line{position:absolute;background:#111;opacity:.55;border-radius:2px}
 
   .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line2);border-radius:999px;padding:6px 12px;background:#fff}
   .dot{width:12px;height:12px;border-radius:50%}
@@ -67,6 +70,12 @@
   }
   @keyframes fall{
     to{ transform:translateY(110vh) rotate(240deg); opacity:.9; }
+  }
+
+  /* Mobile tweak */
+  @media (max-width:420px){
+    .board{grid-template-columns:repeat(5, 58px);gap:10px}
+    .board .cell{width:58px;height:58px;font-size:15px}
   }
 </style>
 </head>
@@ -143,6 +152,7 @@
         <button id="autoFill">Auto Fill 1–25</button>
         <button id="manualFill">Manual Entry</button>
       </div>
+      <!-- ✅ Builder uses the same 70px grid & is centered -->
       <div id="boardBuilder" class="board" style="margin-top:8px"></div>
       <div class="center"><button id="readyBtn" class="primary hidden">I’m Ready</button></div>
 
@@ -154,8 +164,9 @@
     <!-- Game -->
     <div id="step-game" class="hidden">
       <div class="center" style="margin-bottom:6px">
-        <div class="pill"><span class="mini">Turn:</span>&nbsp;<b id="turnName">-</b></div>
+        <!-- ✅ YOU first, then TURN -->
         <div class="pill"><span class="mini">You:</span>&nbsp;<span id="youDot" class="dot"></span>&nbsp;<b id="youName"></b></div>
+        <div class="pill"><span class="mini">Turn:</span>&nbsp;<b id="turnName">-</b></div>
       </div>
 
       <!-- board wrap for strike overlay -->
@@ -313,7 +324,8 @@ function buildBoardInputs(vals, locked){
     const cell = document.createElement("div"); cell.className="cell";
     if(locked){ cell.textContent = v; }
     else{
-      const input = document.createElement("input"); input.type="text"; input.maxLength=2; input.placeholder="";
+      const input = document.createElement("input");
+      input.type="text"; input.maxLength=2; input.placeholder="";
       input.oninput = ()=>{ input.value = input.value.replace(/[^0-9]/g,""); };
       cell.appendChild(input);
     }
@@ -373,7 +385,6 @@ function startGameUI(){
         const w = winnersObj[pid];
         const name = (players[pid]?.nickname || w.name || "A player");
         showWinnerToast(`🎉 ${name} got BINGO! Rank ${w.rank}`);
-        // if 2 players → also say Game Over, then scroll
         if(order.length===2){ setTimeout(()=>{ showWinnerToast("🏁 Game Over"); }, 900); setTimeout(()=>{ $("winnersBox").scrollIntoView({behavior:"smooth",block:"start"});}, 1100); }
         seenWinnerPids.add(pid);
       }
@@ -418,7 +429,6 @@ function updateMyBannerAndLines(){
   const struck = new Set(Object.keys(numbersStruck).map(n=>parseInt(n,10)));
   const lines = linesFromBoard(my.board);
   let done = 0; const completed = [];
-  // rows 0-4, cols 5-9, diag indices 10,11 for identification
   for(let i=0;i<5;i++){ const row = lines[i]; if(row.every(n=>struck.has(n))){ done++; completed.push({type:'row',idx:i}); } }
   for(let i=5;i<10;i++){ const col = lines[i]; if(col.every(n=>struck.has(n))){ done++; completed.push({type:'col',idx:i-5}); } }
   if(lines[10].every(n=>struck.has(n))){ done++; completed.push({type:'d1'}); }
@@ -427,9 +437,9 @@ function updateMyBannerAndLines(){
   for(let i=0;i<5;i++){ const el=$("L"+i); if(i<done) el.classList.add("hit"); else el.classList.remove("hit"); }
   db.ref(`rooms/${my.room}/players/${my.pid}/bingoCount`).set(done);
 
-  // draw strike lines
+  // draw strike lines (thinner now)
   const overlay = $("lineOverlay"); overlay.innerHTML = "";
-  const thickness = 3; // px
+  const thickness = 2; // px ✅ thinner
   completed.forEach(c=>{
     const line = document.createElement("div");
     line.className = "strike-line";
@@ -442,15 +452,13 @@ function updateMyBannerAndLines(){
       line.style.top = "0"; line.style.height = "100%"; line.style.width = thickness+"px";
       line.style.left = `calc(${x}% - ${thickness/2}px)`;
     }else if(c.type==="d1"){
-      // main diagonal
       line.style.width = "140%"; line.style.height = thickness+"px";
-      line.style.left = "-20%"; line.style.top = "calc(50% - 1.5px)";
-      line.style.transform = "rotate(45deg)";
+      line.style.left = "-20%"; line.style.top = "50%";
+      line.style.transform = "translateY(-50%) rotate(45deg)";
     }else if(c.type==="d2"){
-      // anti diagonal
       line.style.width = "140%"; line.style.height = thickness+"px";
-      line.style.left = "-20%"; line.style.top = "calc(50% - 1.5px)";
-      line.style.transform = "rotate(-45deg)";
+      line.style.left = "-20%"; line.style.top = "50%";
+      line.style.transform = "translateY(-50%) rotate(-45deg)";
     }
     overlay.appendChild(line);
   });
