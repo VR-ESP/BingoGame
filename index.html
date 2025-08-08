@@ -25,12 +25,11 @@
   button:disabled{opacity:.6;cursor:not-allowed}
   input[type=text]{width:100%;border:1px solid var(--line2);border-radius:10px;padding:10px;background:#fff;color:#111}
 
-  /* Banner BINGO */
   .bingo-banner{margin:2px auto 10px;display:flex;justify-content:center;gap:10px;letter-spacing:6px}
   .bingo-letter{font-size:40px;font-weight:900;opacity:.28}
   .bingo-letter.hit{opacity:1;transform:scale(1.06);transition:.2s ease}
 
-  /* Boards: consistent 70px circles with nice spacing */
+  /* 70px circles, centered grid */
   .board{display:grid;grid-template-columns:repeat(5, 70px);gap:12px;justify-content:center}
   .board .cell{width:70px;height:70px;border-radius:50%;display:flex;align-items:center;justify-content:center;
         background:#ffffff;border:1px solid var(--line2);color:#111;font-weight:800;font-size:16px;user-select:none;cursor:pointer}
@@ -38,7 +37,6 @@
         font-weight:800;font-size:16px;border-radius:50%}
   .board .cell.struck{color:#111}
 
-  /* Game strike overlay lines */
   .board-wrap{position:relative;width:fit-content;margin:10px auto 6px}
   #lineOverlay{position:absolute;inset:0;pointer-events:none}
   .strike-line{position:absolute;background:#111;opacity:.55;border-radius:2px}
@@ -68,11 +66,8 @@
     position:absolute; top:-30px; width:8px; height:12px; opacity:.95; border-radius:2px;
     animation:fall linear forwards;
   }
-  @keyframes fall{
-    to{ transform:translateY(110vh) rotate(240deg); opacity:.9; }
-  }
+  @keyframes fall{ to{ transform:translateY(110vh) rotate(240deg); opacity:.9; } }
 
-  /* Mobile tweak */
   @media (max-width:420px){
     .board{grid-template-columns:repeat(5, 58px);gap:10px}
     .board .cell{width:58px;height:58px;font-size:15px}
@@ -80,7 +75,6 @@
 </style>
 </head>
 <body>
-<!-- global top toast & confetti -->
 <div class="toast" id="toast"><div class="toast-inner" id="toastText">🎉 Player won!</div></div>
 <div class="confetti" id="confetti"></div>
 
@@ -89,7 +83,6 @@
 
     <h1>Multiplayer Bingo Online</h1>
 
-    <!-- Big colorful BINGO -->
     <div id="banner" class="bingo-banner hidden">
       <span class="bingo-letter" id="L0" style="color:#ef4444">B</span>
       <span class="bingo-letter" id="L1" style="color:#f59e0b">I</span>
@@ -98,7 +91,6 @@
       <span class="bingo-letter" id="L4" style="color:#a855f7">O</span>
     </div>
 
-    <!-- Choose -->
     <div id="step-choose" class="center" style="margin:8px 0 6px">
       <button id="btnCreate" class="primary">Create Room</button>
       <button id="btnJoin">Join Room</button>
@@ -152,7 +144,6 @@
         <button id="autoFill">Auto Fill 1–25</button>
         <button id="manualFill">Manual Entry</button>
       </div>
-      <!-- ✅ Builder uses the same 70px grid & is centered -->
       <div id="boardBuilder" class="board" style="margin-top:8px"></div>
       <div class="center"><button id="readyBtn" class="primary hidden">I’m Ready</button></div>
 
@@ -164,12 +155,10 @@
     <!-- Game -->
     <div id="step-game" class="hidden">
       <div class="center" style="margin-bottom:6px">
-        <!-- ✅ YOU first, then TURN -->
         <div class="pill"><span class="mini">You:</span>&nbsp;<span id="youDot" class="dot"></span>&nbsp;<b id="youName"></b></div>
         <div class="pill"><span class="mini">Turn:</span>&nbsp;<b id="turnName">-</b></div>
       </div>
 
-      <!-- board wrap for strike overlay -->
       <div class="board-wrap">
         <div id="gameBoard" class="board"></div>
         <div id="lineOverlay"></div>
@@ -188,7 +177,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
 <script>
-/* ============ 1) Firebase Config (replace) ============ */
+/* ============ Firebase Config (replace) ============ */
 const firebaseConfig = {
   apiKey: "AIzaSyDY9AUUyco-stWWr3HxZ4VYDASN5JQHlAY",
   authDomain: "bingogame-ea6c9.firebaseapp.com",
@@ -202,153 +191,150 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-/* ============ 2) State ============ */
+/* ============ State ============ */
 const PASTEL = ["#ff6b6b","#60a5fa","#34d399","#fbbf24","#a78bfa","#22d3ee","#f472b6","#86efac"];
 let my = { pid:null, name:"", color:"", room:"", board:[], ready:false };
-let players = {};             // pid -> data
-let order = [];               // join order
-let numbersStruck = {};       // num -> pid
-let currentTurnIndex = 0;
-let winnersObj = {};          // pid -> {name,rank}
-let gameOver = false;
+let players = {}; let order = [];
+let numbersStruck = {}; let currentTurnIndex = 0;
+let winnersObj = {}; let gameOver = false;
 let seenWinnerPids = new Set();
 
-/* ============ 3) Helpers ============ */
+/* ============ Helpers ============ */
 const $ = id => document.getElementById(id);
 const show = id => $(id).classList.remove("hidden");
 const hide = id => $(id).classList.add("hidden");
 const code = ()=>Math.random().toString(36).substring(2,7).toUpperCase();
-
-function toRGBA(hex, a=0.28){ const h=hex.replace("#",""); const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16); return `rgba(${r},${g},${b},${a})`; }
+const toRGBA = (hex, a=0.28)=>{ const h=hex.replace("#",""); const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16); return `rgba(${r},${g},${b},${a})`; };
 function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
 function linesFromBoard(b){
-  const rows = [0,1,2,3,4].map(r=>b.slice(r*5, r*5+5));
-  const cols = [0,1,2,3,4].map(c=>[b[c],b[c+5],b[c+10],b[c+15],b[c+20]]);
-  const d1 = [b[0],b[6],b[12],b[18],b[24]];
-  const d2 = [b[4],b[8],b[12],b[16],b[20]];
-  return [...rows, ...cols, d1, d2];
+  const rows=[0,1,2,3,4].map(r=>b.slice(r*5, r*5+5));
+  const cols=[0,1,2,3,4].map(c=>[b[c],b[c+5],b[c+10],b[c+15],b[c+20]]);
+  const d1=[b[0],b[6],b[12],b[18],b[24]], d2=[b[4],b[8],b[12],b[16],b[20]];
+  return [...rows,...cols,d1,d2];
 }
 
-/* ===== winner toast & confetti ===== */
+/* ===== toast & confetti ===== */
 function showWinnerToast(text){
-  const toast = $("toast"), tx = $("toastText");
-  tx.textContent = text;
-  toast.classList.remove("hide"); toast.classList.add("show");
-  makeConfetti();
-  setTimeout(()=>{ toast.classList.remove("show"); toast.classList.add("hide"); }, 2400);
+  const t=$("toast"), tx=$("toastText"); tx.textContent=text;
+  t.classList.remove("hide"); t.classList.add("show");
+  makeConfetti(); setTimeout(()=>{ t.classList.remove("show"); t.classList.add("hide"); },2400);
 }
 function makeConfetti(){
-  const c = $("confetti"); c.innerHTML = "";
-  const colors = ["#ef4444","#f59e0b","#10b981","#3b82f6","#a855f7","#22d3ee"];
-  for(let i=0;i<120;i++){
-    const piece = document.createElement("i");
-    piece.style.left = Math.random()*100 + "vw";
-    piece.style.background = colors[i%colors.length];
-    piece.style.animationDuration = (1.6 + Math.random()*1.2) + "s";
-    piece.style.transform = `translateY(0) rotate(${Math.random()*180}deg)`;
+  const c=$("confetti"); c.innerHTML="";
+  const colors=["#ef4444","#f59e0b","#10b981","#3b82f6","#a855f7","#22d3ee"];
+  for(let i=0;i<120;i++){ const piece=document.createElement("i");
+    piece.style.left=Math.random()*100+"vw"; piece.style.background=colors[i%colors.length];
+    piece.style.animationDuration=(1.6+Math.random()*1.2)+"s";
     c.appendChild(piece);
   }
 }
 
-/* ============ 4) UI Nav ============ */
+/* ===== turn guard: skip finished winners ===== */
+async function ensureTurnValid(){
+  const turnSnap = await db.ref(`rooms/${my.room}/currentTurn`).get();
+  let idx = turnSnap.val() ?? 0;
+  const total = order.length;
+  if(total===0) return;
+
+  for(let i=0;i<total;i++){
+    const pid = order[idx];
+    const finished = players[pid]?.finished;
+    if(!finished){
+      if(idx !== turnSnap.val()){
+        await db.ref(`rooms/${my.room}/currentTurn`).set(idx);
+      }
+      return;
+    }
+    idx = (idx+1) % total;
+  }
+  // everyone finished -> end game
+  await db.ref(`rooms/${my.room}/gameOver`).set(true);
+}
+
+/* ============ UI Nav ============ */
 $("btnCreate").onclick = ()=>{ hide("step-choose"); show("step-create"); $("createCode").value = code(); };
 $("btnJoin").onclick   = ()=>{ hide("step-choose"); show("step-join"); };
 $("back1").onclick = ()=>{ hide("step-create"); show("step-choose"); };
 $("back2").onclick = ()=>{ hide("step-join"); show("step-choose"); };
 
-/* ============ 5) Create / Join ============ */
+/* ============ Create / Join ============ */
 $("createGo").onclick = async ()=>{
-  const nickname = $("createName").value.trim();
-  const room = $("createCode").value.trim().toUpperCase();
-  if(!nickname || !room) return alert("Enter nickname and room code.");
-  my = { pid:"p"+Date.now(), name:nickname, color:PASTEL[0], room, board:[], ready:false };
+  const nickname=$("createName").value.trim(), room=$("createCode").value.trim().toUpperCase();
+  if(!nickname||!room) return alert("Enter nickname and room code.");
+  my={ pid:"p"+Date.now(), name:nickname, color:PASTEL[0], room, board:[], ready:false };
   await db.ref(`rooms/${room}`).set({ createdAt:Date.now(), started:false, currentTurn:0, order:[my.pid], nextRank:1, gameOver:false });
   await db.ref(`rooms/${room}/players/${my.pid}`).set({ nickname, color:my.color, ready:false, board:[], rank:null, finished:false, bingoCount:0 });
   enterLobby();
 };
-
 $("joinGo").onclick = async ()=>{
-  const nickname = $("joinName").value.trim();
-  const room = $("joinCode").value.trim().toUpperCase();
-  if(!nickname || !room) return alert("Enter nickname and room code.");
-  const r = db.ref(`rooms/${room}`); const s = await r.get();
-  if(!s.exists()) return alert("Room not found.");
-  const orderSnap = await db.ref(`rooms/${room}/order`).get(); const ord = orderSnap.val() || [];
-  my = { pid:"p"+Date.now(), name:nickname, color:PASTEL[ord.length % PASTEL.length], room, board:[], ready:false };
-  await db.ref(`rooms/${room}/order`).set([...ord, my.pid]);
+  const nickname=$("joinName").value.trim(), room=$("joinCode").value.trim().toUpperCase();
+  if(!nickname||!room) return alert("Enter nickname and room code.");
+  const r=db.ref(`rooms/${room}`), s=await r.get(); if(!s.exists()) return alert("Room not found.");
+  const orderSnap=await db.ref(`rooms/${room}/order`).get(); const ord=orderSnap.val()||[];
+  my={ pid:"p"+Date.now(), name:nickname, color:PASTEL[ord.length%PASTEL.length], room, board:[], ready:false };
+  await db.ref(`rooms/${room}/order`).set([...ord,my.pid]);
   await db.ref(`rooms/${room}/players/${my.pid}`).set({ nickname, color:my.color, ready:false, board:[], rank:null, finished:false, bingoCount:0 });
   enterLobby();
 };
 
-/* ============ 6) Lobby & Board setup ============ */
+/* ============ Lobby & Board setup ============ */
 function enterLobby(){
   hide("step-create"); hide("step-join"); show("step-lobby");
-  $("roomCodeLabel").textContent = my.room;
+  $("roomCodeLabel").textContent=my.room;
 
-  db.ref(`rooms/${my.room}/players`).on("value", snap=>{ players = snap.val() || {}; renderPlayers(); updateStartVisibility(); });
-  db.ref(`rooms/${my.room}/order`).on("value", snap=>{ order = snap.val() || []; renderPlayers(); updateStartVisibility(); });
+  db.ref(`rooms/${my.room}/players`).on("value", async snap=>{
+    players=snap.val()||{}; renderPlayers(); updateStartVisibility();
+    if($("step-game").classList.contains("hidden")===false){ await ensureTurnValid(); }
+  });
+  db.ref(`rooms/${my.room}/order`).on("value", async snap=>{
+    order=snap.val()||[]; renderPlayers(); updateStartVisibility();
+    if($("step-game").classList.contains("hidden")===false){ await ensureTurnValid(); }
+  });
   db.ref(`rooms/${my.room}/started`).on("value", snap=>{ if(snap.val()===true){ startGameUI(); } });
 
-  $("boardBuilder").innerHTML = ""; hide("readyBtn");
-  $("autoFill").disabled = false; $("manualFill").disabled = false;
+  $("boardBuilder").innerHTML=""; hide("readyBtn");
+  $("autoFill").disabled=false; $("manualFill").disabled=false;
 }
-
 function renderPlayers(){
-  const c = $("players"); c.innerHTML="";
+  const c=$("players"); c.innerHTML="";
   order.forEach(pid=>{
-    const p = players[pid]; if(!p) return;
-    const el = document.createElement("div");
-    el.className="pill";
-    el.innerHTML = `<span class="dot" style="background:${p.color}"></span><b>${p.nickname}</b>${p.ready?' <span class="mini" style="color:#10b981">&nbsp;READY</span>':' <span class="mini">&nbsp;not ready</span>'}`;
+    const p=players[pid]; if(!p) return;
+    const el=document.createElement("div"); el.className="pill";
+    el.innerHTML=`<span class="dot" style="background:${p.color}"></span><b>${p.nickname}</b>${p.ready?' <span class="mini" style="color:#10b981">&nbsp;READY</span>':' <span class="mini">&nbsp;not ready</span>'}`;
     c.appendChild(el);
   });
 }
 function updateStartVisibility(){
-  const allReady = order.length>0 && order.every(pid=>players[pid]?.ready);
+  const allReady=order.length>0&&order.every(pid=>players[pid]?.ready);
   if(allReady) show("startBtn"); else hide("startBtn");
 }
 
-$("autoFill").onclick = ()=>{
-  my.board = shuffle(Array.from({length:25},(_,i)=>i+1));
-  buildBoardInputs(my.board, true);
-  show("readyBtn");
-};
-$("manualFill").onclick = ()=>{
-  buildBoardInputs(Array(25).fill(""), false); // blank circles
-  show("readyBtn");
-};
-
-function buildBoardInputs(vals, locked){
-  const host = $("boardBuilder"); host.innerHTML = "";
-  vals.forEach((v)=>{
-    const cell = document.createElement("div"); cell.className="cell";
-    if(locked){ cell.textContent = v; }
-    else{
-      const input = document.createElement("input");
-      input.type="text"; input.maxLength=2; input.placeholder="";
-      input.oninput = ()=>{ input.value = input.value.replace(/[^0-9]/g,""); };
-      cell.appendChild(input);
-    }
+$("autoFill").onclick=()=>{ my.board=shuffle(Array.from({length:25},(_,i)=>i+1)); buildBoardInputs(my.board,true); show("readyBtn"); };
+$("manualFill").onclick=()=>{ buildBoardInputs(Array(25).fill(""),false); show("readyBtn"); };
+function buildBoardInputs(vals,locked){
+  const host=$("boardBuilder"); host.innerHTML="";
+  vals.forEach(v=>{
+    const cell=document.createElement("div"); cell.className="cell";
+    if(locked){ cell.textContent=v; }
+    else{ const input=document.createElement("input"); input.type="text"; input.maxLength=2; input.placeholder=""; input.oninput=()=>{input.value=input.value.replace(/[^0-9]/g,"");}; cell.appendChild(input); }
     host.appendChild(cell);
   });
-  $("autoFill").disabled = locked; $("manualFill").disabled = locked;
+  $("autoFill").disabled=locked; $("manualFill").disabled=locked;
 }
-
-$("readyBtn").onclick = async ()=>{
+$("readyBtn").onclick=async ()=>{
   if(my.board.length!==25){
-    const inputs = Array.from($("boardBuilder").querySelectorAll("input"));
-    const vals = inputs.map(i=>parseInt(i.value,10));
-    if(vals.some(v=>!Number.isInteger(v) || v<1 || v>25)) return alert("Enter numbers 1–25.");
+    const inputs=Array.from($("boardBuilder").querySelectorAll("input"));
+    const vals=inputs.map(i=>parseInt(i.value,10));
+    if(vals.some(v=>!Number.isInteger(v)||v<1||v>25)) return alert("Enter numbers 1–25.");
     if(new Set(vals).size!==25) return alert("Numbers must be unique (1–25).");
-    my.board = vals;
+    my.board=vals;
   }
   await db.ref(`rooms/${my.room}/players/${my.pid}/board`).set(my.board);
   await db.ref(`rooms/${my.room}/players/${my.pid}/ready`).set(true);
-  $("readyBtn").textContent = "Ready ✓"; $("readyBtn").disabled = true;
+  $("readyBtn").textContent="Ready ✓"; $("readyBtn").disabled=true;
 };
-
-$("startBtn").onclick = async ()=>{
-  const allReady = order.every(pid=>players[pid]?.ready);
+$("startBtn").onclick=async ()=>{
+  const allReady=order.every(pid=>players[pid]?.ready);
   if(!allReady) return alert("All players must be ready.");
   await db.ref(`rooms/${my.room}/numbers/struck`).set(null);
   await db.ref(`rooms/${my.room}/winners`).set(null);
@@ -358,193 +344,129 @@ $("startBtn").onclick = async ()=>{
   await db.ref(`rooms/${my.room}/currentTurn`).set(0);
 };
 
-/* ============ 7) Game ============ */
+/* ============ Game ============ */
 function startGameUI(){
   hide("step-lobby"); show("step-game"); show("banner");
-  $("youDot").style.background = my.color; $("youName").textContent = my.name;
+  $("youDot").style.background=my.color; $("youName").textContent=my.name;
   renderGameBoard();
 
   db.ref(`rooms/${my.room}/currentTurn`).on("value", s=>{
-    currentTurnIndex = s.val() ?? 0;
-    const pid = order[currentTurnIndex] || "";
-    $("turnName").textContent = players[pid]?.nickname || "-";
+    currentTurnIndex=s.val()??0;
+    const pid=order[currentTurnIndex]||""; $("turnName").textContent=players[pid]?.nickname||"-";
   });
   db.ref(`rooms/${my.room}/numbers/struck`).on("value", async s=>{
-    numbersStruck = s.val() || {};
-    paintBoard();                // paint cells
-    updateMyBannerAndLines();    // banner + row/col/diag strike lines
-    await autoCheckWinFromUpdate();
+    numbersStruck=s.val()||{}; paintBoard(); updateMyBannerAndLines(); await autoCheckWinFromUpdate();
   });
-  db.ref(`rooms/${my.room}/winners`).on("value", s=>{
-    const before = new Set(Object.keys(winnersObj||{}));
-    winnersObj = s.val() || {};
-    renderWinners();
-    const after = new Set(Object.keys(winnersObj));
-    for(const pid of after){
-      if(!before.has(pid) && !seenWinnerPids.has(pid)){
-        const w = winnersObj[pid];
-        const name = (players[pid]?.nickname || w.name || "A player");
-        showWinnerToast(`🎉 ${name} got BINGO! Rank ${w.rank}`);
-        if(order.length===2){ setTimeout(()=>{ showWinnerToast("🏁 Game Over"); }, 900); setTimeout(()=>{ $("winnersBox").scrollIntoView({behavior:"smooth",block:"start"});}, 1100); }
-        seenWinnerPids.add(pid);
-      }
-    }
+  db.ref(`rooms/${my.room}/winners`).on("value", async s=>{
+    const before=new Set(Object.keys(winnersObj||{})); winnersObj=s.val()||{}; renderWinners();
+    const after=new Set(Object.keys(winnersObj));
+    for(const pid of after){ if(!before.has(pid)&&!seenWinnerPids.has(pid)){
+      const w=winnersObj[pid]; const name=(players[pid]?.nickname||w.name||"A player");
+      showWinnerToast(`🎉 ${name} got BINGO! Rank ${w.rank}`);
+      if(order.length===2){ setTimeout(()=>{ showWinnerToast("🏁 Game Over"); },900); setTimeout(()=>{ $("winnersBox").scrollIntoView({behavior:"smooth",block:"start"});},1100); }
+      seenWinnerPids.add(pid);
+    }}
+    await ensureTurnValid(); // ✅ turn may be pointing at a finished winner — fix it
   });
   db.ref(`rooms/${my.room}/gameOver`).on("value", s=>{
-    gameOver = !!s.val();
-    if(gameOver){ disableBoard(); }
+    gameOver=!!s.val(); if(gameOver) disableBoard();
   });
 }
-
 function renderGameBoard(){
-  const host = $("gameBoard"); host.innerHTML = "";
+  const host=$("gameBoard"); host.innerHTML="";
   my.board.forEach(num=>{
-    const cell = document.createElement("div");
-    cell.className="cell"; cell.dataset.num = num; cell.textContent = num;
-    cell.onclick = ()=>tryStrike(num);
-    host.appendChild(cell);
+    const cell=document.createElement("div"); cell.className="cell"; cell.dataset.num=num; cell.textContent=num;
+    cell.onclick=()=>tryStrike(num); host.appendChild(cell);
   });
   paintBoard();
 }
-
 function paintBoard(){
-  const cells = Array.from($("gameBoard").children);
-  cells.forEach(c=>{
-    const num = parseInt(c.dataset.num,10);
-    const striker = numbersStruck[num];
-    if(striker){
-      const color = players[striker]?.color || "#999";
-      c.classList.add("struck");
-      c.style.background = toRGBA(color, 0.28);
-      c.style.borderColor = color;
-    }else{
-      c.classList.remove("struck");
-      c.style.background = "#fff";
-      c.style.borderColor = "#d1d5db";
-    }
+  Array.from($("gameBoard").children).forEach(c=>{
+    const num=parseInt(c.dataset.num,10); const striker=numbersStruck[num];
+    if(striker){ const color=players[striker]?.color||"#999"; c.classList.add("struck"); c.style.background=toRGBA(color,0.28); c.style.borderColor=color; }
+    else{ c.classList.remove("struck"); c.style.background="#fff"; c.style.borderColor="#d1d5db"; }
   });
 }
-
 function updateMyBannerAndLines(){
-  const struck = new Set(Object.keys(numbersStruck).map(n=>parseInt(n,10)));
-  const lines = linesFromBoard(my.board);
-  let done = 0; const completed = [];
-  for(let i=0;i<5;i++){ const row = lines[i]; if(row.every(n=>struck.has(n))){ done++; completed.push({type:'row',idx:i}); } }
-  for(let i=5;i<10;i++){ const col = lines[i]; if(col.every(n=>struck.has(n))){ done++; completed.push({type:'col',idx:i-5}); } }
+  const struck=new Set(Object.keys(numbersStruck).map(n=>parseInt(n,10)));
+  const lines=linesFromBoard(my.board);
+  let done=0; const completed=[];
+  for(let i=0;i<5;i++){ const row=lines[i]; if(row.every(n=>struck.has(n))){ done++; completed.push({type:'row',idx:i}); } }
+  for(let i=5;i<10;i++){ const col=lines[i]; if(col.every(n=>struck.has(n))){ done++; completed.push({type:'col',idx:i-5}); } }
   if(lines[10].every(n=>struck.has(n))){ done++; completed.push({type:'d1'}); }
   if(lines[11].every(n=>struck.has(n))){ done++; completed.push({type:'d2'}); }
-
   for(let i=0;i<5;i++){ const el=$("L"+i); if(i<done) el.classList.add("hit"); else el.classList.remove("hit"); }
   db.ref(`rooms/${my.room}/players/${my.pid}/bingoCount`).set(done);
-
-  // draw strike lines (thinner now)
-  const overlay = $("lineOverlay"); overlay.innerHTML = "";
-  const thickness = 2; // px ✅ thinner
+  const overlay=$("lineOverlay"); overlay.innerHTML=""; const t=2;
   completed.forEach(c=>{
-    const line = document.createElement("div");
-    line.className = "strike-line";
-    if(c.type==="row"){
-      const y = ((c.idx + 0.5) / 5) * 100;
-      line.style.left = "0"; line.style.width = "100%"; line.style.height = thickness+"px";
-      line.style.top = `calc(${y}% - ${thickness/2}px)`;
-    }else if(c.type==="col"){
-      const x = ((c.idx + 0.5) / 5) * 100;
-      line.style.top = "0"; line.style.height = "100%"; line.style.width = thickness+"px";
-      line.style.left = `calc(${x}% - ${thickness/2}px)`;
-    }else if(c.type==="d1"){
-      line.style.width = "140%"; line.style.height = thickness+"px";
-      line.style.left = "-20%"; line.style.top = "50%";
-      line.style.transform = "translateY(-50%) rotate(45deg)";
-    }else if(c.type==="d2"){
-      line.style.width = "140%"; line.style.height = thickness+"px";
-      line.style.left = "-20%"; line.style.top = "50%";
-      line.style.transform = "translateY(-50%) rotate(-45deg)";
-    }
+    const line=document.createElement("div"); line.className="strike-line";
+    if(c.type==="row"){ const y=((c.idx+0.5)/5)*100; line.style.left="0"; line.style.width="100%"; line.style.height=t+"px"; line.style.top=`calc(${y}% - ${t/2}px)`; }
+    else if(c.type==="col"){ const x=((c.idx+0.5)/5)*100; line.style.top="0"; line.style.height="100%"; line.style.width=t+"px"; line.style.left=`calc(${x}% - ${t/2}px)`; }
+    else if(c.type==="d1"){ line.style.width="140%"; line.style.height=t+"px"; line.style.left="-20%"; line.style.top="50%"; line.style.transform="translateY(-50%) rotate(45deg)"; }
+    else if(c.type==="d2"){ line.style.width="140%"; line.style.height=t+"px"; line.style.left="-20%"; line.style.top="50%"; line.style.transform="translateY(-50%) rotate(-45deg)"; }
     overlay.appendChild(line);
   });
 }
+function disableBoard(){ Array.from($("gameBoard").children).forEach(c=>c.onclick=null); }
 
-function disableBoard(){
-  Array.from($("gameBoard").children).forEach(c=>c.onclick=null);
-}
-
-/* skip finished players when advancing turn */
+/* advance turn skipping finished */
 async function advanceTurn(){
-  let idx = currentTurnIndex;
-  const total = order.length;
+  const total=order.length; if(total===0) return;
+  let idx=currentTurnIndex;
   for(let tries=0; tries<total; tries++){
-    idx = (idx+1) % total;
-    const pid = order[idx];
-    const pSnap = await db.ref(`rooms/${my.room}/players/${pid}/finished`).get();
-    if(!pSnap.val()) { await db.ref(`rooms/${my.room}/currentTurn`).set(idx); return; }
+    idx=(idx+1)%total;
+    if(!players[order[idx]]?.finished){ await db.ref(`rooms/${my.room}/currentTurn`).set(idx); return; }
   }
   await db.ref(`rooms/${my.room}/gameOver`).set(true);
 }
-
 async function tryStrike(num){
   if(gameOver) return;
-  const myIndex = order.indexOf(my.pid);
-  const meFinishedSnap = await db.ref(`rooms/${my.room}/players/${my.pid}/finished`).get();
-  if(meFinishedSnap.val()) return;
-  if(myIndex !== currentTurnIndex) return alert("Not your turn!");
+  const myIndex=order.indexOf(my.pid);
+  if((await db.ref(`rooms/${my.room}/players/${my.pid}/finished`).get()).val()) return;
+  if(myIndex!==currentTurnIndex) return alert("Not your turn!");
 
-  const ref = db.ref(`rooms/${my.room}/numbers/struck/${num}`);
-  let assigned = false;
-  await ref.transaction(current=>{
-    if(current) return current;
-    assigned = true; return my.pid;
-  });
+  const ref=db.ref(`rooms/${my.room}/numbers/struck/${num}`);
+  let assigned=false;
+  await ref.transaction(current=>{ if(current) return current; assigned=true; return my.pid; });
   if(!assigned) return;
   await advanceTurn();
 }
 
+/* self-check win on every update; also fix turn if I just finished */
 async function autoCheckWinFromUpdate(){
   if(gameOver) return;
+  const struck=new Set(Object.keys(numbersStruck).map(n=>parseInt(n,10)));
+  const lines=linesFromBoard(my.board);
+  let done=0; lines.forEach(line=>{ if(line.every(n=>struck.has(n))) done++; });
 
-  const struck = new Set(Object.keys(numbersStruck).map(n=>parseInt(n,10)));
-  const lines = linesFromBoard(my.board);
-  let done = 0; lines.forEach(line=>{ if(line.every(n=>struck.has(n))) done++; });
+  const meRef=db.ref(`rooms/${my.room}/players/${my.pid}`);
+  const meSnap=await meRef.get(); const me=meSnap.val()||{}; if(me.finished) return;
 
-  const meRef = db.ref(`rooms/${my.room}/players/${my.pid}`);
-  const meSnap = await meRef.get();
-  const me = meSnap.val() || {};
-  if(me.finished) return;
-
-  if(done >= 5){
-    const rankRef = db.ref(`rooms/${my.room}/nextRank`);
-    let assigned;
-    await rankRef.transaction(cur => { cur = cur || 1; assigned = cur; return cur + 1; });
-
-    const existingRankSnap = await db.ref(`rooms/${my.room}/players/${my.pid}/rank`).get();
-    if(!existingRankSnap.exists()){
-      await db.ref(`rooms/${my.room}/players/${my.pid}`).update({ rank: assigned, finished: true });
-      await db.ref(`rooms/${my.room}/winners/${my.pid}`).set({ name: my.name, rank: assigned });
+  if(done>=5){
+    const rankRef=db.ref(`rooms/${my.room}/nextRank`); let assigned;
+    await rankRef.transaction(cur=>{ cur=cur||1; assigned=cur; return cur+1; });
+    const already=await db.ref(`rooms/${my.room}/players/${my.pid}/rank`).get();
+    if(!already.exists()){
+      await db.ref(`rooms/${my.room}/players/${my.pid}`).update({ rank:assigned, finished:true });
+      await db.ref(`rooms/${my.room}/winners/${my.pid}`).set({ name:my.name, rank:assigned });
     }
-
-    if(order.length === 2){
-      await db.ref(`rooms/${my.room}/gameOver`).set(true);
-      setTimeout(()=>{ $("winnersBox").scrollIntoView({behavior:"smooth", block:"start"}); }, 900);
-    }
+    if(order.length===2){ await db.ref(`rooms/${my.room}/gameOver`).set(true); setTimeout(()=>{ $("winnersBox").scrollIntoView({behavior:"smooth",block:"start"}); },900); }
+    await ensureTurnValid(); // ✅ if it was my turn, move it on
   }
 
-  const playersSnap = await db.ref(`rooms/${my.room}/players`).get();
-  const data = playersSnap.val() || {};
-  const finishedCount = Object.values(data).filter(p=>p.finished).length;
-  if(finishedCount === Object.keys(data).length){
-    await db.ref(`rooms/${my.room}/gameOver`).set(true);
-  }
+  const playersSnap=await db.ref(`rooms/${my.room}/players`).get();
+  const data=playersSnap.val()||{}; const finishedCount=Object.values(data).filter(p=>p.finished).length;
+  if(finishedCount===Object.keys(data).length){ await db.ref(`rooms/${my.room}/gameOver`).set(true); }
 }
 
 /* winners list */
 function renderWinners(){
-  const box = $("winnersBox");
-  const list = $("winnerList"); list.innerHTML = "";
-  const entries = Object.entries(winnersObj).map(([pid,v])=>({pid, ...v}));
-  entries.sort((a,b)=>a.rank-b.rank);
+  const list=$("winnerList"); list.innerHTML="";
+  const entries=Object.entries(winnersObj).map(([pid,v])=>({pid,...v})).sort((a,b)=>a.rank-b.rank);
   entries.forEach(w=>{
-    const li = document.createElement("li");
-    const color = players[w.pid]?.color || "#999";
-    li.innerHTML = `<span class="dot" style="background:${color};display:inline-block;margin-right:8px"></span><b>${w.name}</b> — Rank ${w.rank}`;
+    const color=players[w.pid]?.color||"#999";
+    const li=document.createElement("li");
+    li.innerHTML=`<span class="dot" style="background:${color};display:inline-block;margin-right:8px"></span><b>${w.name}</b> — Rank ${w.rank}`;
     list.appendChild(li);
   });
   if(entries.length>0) show("winnersBox");
