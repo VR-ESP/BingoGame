@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Multiplayer Bingo</title>
+<title>Multiplayer Bingo Online</title>
 <style>
   :root{
     --bg:#ffffff; --card:#ffffff; --ink:#111; --muted:#6b7280;
@@ -31,10 +31,10 @@
   .bingo-letter.hit{opacity:1;transform:scale(1.06);transition:.2s ease}
 
   /* Board */
-  .board{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:12px auto 8px;max-width:460px}
+  .board{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:10px auto 6px;max-width:360px}
   .cell{aspect-ratio:1/1;border-radius:50%;display:flex;align-items:center;justify-content:center;
-        background:#ffffff;border:1px solid var(--line2);color:#111;font-weight:800;font-size:18px;user-select:none;cursor:pointer}
-  .cell input{width:100%;height:100%;border:0;background:transparent;text-align:center;color:#111;font-weight:800;font-size:18px;border-radius:50%}
+        background:#ffffff;border:1px solid var(--line2);color:#111;font-weight:800;font-size:16px;user-select:none;cursor:pointer}
+  .cell input{width:100%;height:100%;border:0;background:transparent;text-align:center;color:#111;font-weight:800;font-size:16px;border-radius:50%}
   .cell.struck{color:#111}
   .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line2);border-radius:999px;padding:6px 12px;background:#fff}
   .dot{width:12px;height:12px;border-radius:50%}
@@ -51,7 +51,7 @@
 <div class="wrap">
   <div class="card">
 
-    <h1>Multiplayer Bingo</h1>
+    <h1>Multiplayer Bingo Online</h1>
 
     <!-- Big colorful BINGO -->
     <div id="banner" class="bingo-banner hidden">
@@ -169,37 +169,35 @@ const db = firebase.database();
 
 /* ============ 2) State ============ */
 const PASTEL = ["#ff6b6b","#60a5fa","#34d399","#fbbf24","#a78bfa","#22d3ee","#f472b6","#86efac"];
-const COLORS = PASTEL; // lighter palette
 let my = { pid:null, name:"", color:"", room:"", board:[], ready:false };
-let players = {};              // pid -> player
-let order = [];                // join order
-let numbersStruck = {};        // num -> pid
+let players = {};             // pid -> data
+let order = [];               // join order
+let numbersStruck = {};       // num -> pid
 let currentTurnIndex = 0;
-let winnersObj = {};           // pid -> {name,rank}
+let winnersObj = {};          // pid -> {name,rank}
+let gameOver = false;
 
 /* ============ 3) Helpers ============ */
-const $ = (id)=>document.getElementById(id);
+const $ = id => document.getElementById(id);
 const show = id => $(id).classList.remove("hidden");
 const hide = id => $(id).classList.add("hidden");
 const code = ()=>Math.random().toString(36).substring(2,7).toUpperCase();
 
 function toRGBA(hex, a=0.28){
-  // #rrggbb → rgba(r,g,b,a)
   const h = hex.replace("#","");
-  const r=parseInt(h.substring(0,2),16), g=parseInt(h.substring(2,4),16), b=parseInt(h.substring(4,6),16);
+  const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
   return `rgba(${r},${g},${b},${a})`;
 }
-
 function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
-const linesFromBoard = (b) => {
+function linesFromBoard(b){
   const rows = [0,1,2,3,4].map(r=>b.slice(r*5, r*5+5));
   const cols = [0,1,2,3,4].map(c=>[b[c],b[c+5],b[c+10],b[c+15],b[c+20]]);
   const d1 = [b[0],b[6],b[12],b[18],b[24]];
   const d2 = [b[4],b[8],b[12],b[16],b[20]];
-  return [...rows, ...cols, d1, d2]; // ✅ diagonals included (no extra array)
-};
+  return [...rows, ...cols, d1, d2]; // ✅ includes diagonals
+}
 
-/* ============ 4) UI navigation ============ */
+/* ============ 4) UI Nav ============ */
 $("btnCreate").onclick = ()=>{ hide("step-choose"); show("step-create"); $("createCode").value = code(); };
 $("btnJoin").onclick   = ()=>{ hide("step-choose"); show("step-join"); };
 $("back1").onclick = ()=>{ hide("step-create"); show("step-choose"); };
@@ -210,8 +208,8 @@ $("createGo").onclick = async ()=>{
   const nickname = $("createName").value.trim();
   const room = $("createCode").value.trim().toUpperCase();
   if(!nickname || !room) return alert("Enter nickname and room code.");
-  my = { pid:"p"+Date.now(), name:nickname, color:COLORS[0], room, board:[], ready:false };
-  await db.ref(`rooms/${room}`).set({ createdAt:Date.now(), started:false, currentTurn:0, order:[my.pid], nextRank:1 });
+  my = { pid:"p"+Date.now(), name:nickname, color:PASTEL[0], room, board:[], ready:false };
+  await db.ref(`rooms/${room}`).set({ createdAt:Date.now(), started:false, currentTurn:0, order:[my.pid], nextRank:1, gameOver:false });
   await db.ref(`rooms/${room}/players/${my.pid}`).set({ nickname, color:my.color, ready:false, board:[], rank:null, finished:false, bingoCount:0 });
   enterLobby();
 };
@@ -220,12 +218,11 @@ $("joinGo").onclick = async ()=>{
   const nickname = $("joinName").value.trim();
   const room = $("joinCode").value.trim().toUpperCase();
   if(!nickname || !room) return alert("Enter nickname and room code.");
-  const r = db.ref(`rooms/${room}`);
-  const s = await r.get();
+  const r = db.ref(`rooms/${room}`); const s = await r.get();
   if(!s.exists()) return alert("Room not found.");
   const orderSnap = await db.ref(`rooms/${room}/order`).get();
   const ord = orderSnap.val() || [];
-  my = { pid:"p"+Date.now(), name:nickname, color:COLORS[ord.length % COLORS.length], room, board:[], ready:false };
+  my = { pid:"p"+Date.now(), name:nickname, color:PASTEL[ord.length % PASTEL.length], room, board:[], ready:false };
   await db.ref(`rooms/${room}/order`).set([...ord, my.pid]);
   await db.ref(`rooms/${room}/players/${my.pid}`).set({ nickname, color:my.color, ready:false, board:[], rank:null, finished:false, bingoCount:0 });
   enterLobby();
@@ -238,23 +235,19 @@ function enterLobby(){
 
   db.ref(`rooms/${my.room}/players`).on("value", snap=>{
     players = snap.val() || {};
-    renderPlayers();
-    updateStartVisibility();
+    renderPlayers(); updateStartVisibility();
   });
   db.ref(`rooms/${my.room}/order`).on("value", snap=>{
     order = snap.val() || [];
-    renderPlayers();
-    updateStartVisibility();
+    renderPlayers(); updateStartVisibility();
   });
   db.ref(`rooms/${my.room}/started`).on("value", snap=>{
     if(snap.val()===true){ startGameUI(); }
   });
 
-  // reset builder
   $("boardBuilder").innerHTML = "";
   hide("readyBtn");
-  $("autoFill").disabled = false;
-  $("manualFill").disabled = false;
+  $("autoFill").disabled = false; $("manualFill").disabled = false;
 }
 
 function renderPlayers(){
@@ -267,7 +260,6 @@ function renderPlayers(){
     c.appendChild(el);
   });
 }
-
 function updateStartVisibility(){
   const allReady = order.length>0 && order.every(pid=>players[pid]?.ready);
   if(allReady) show("startBtn"); else hide("startBtn");
@@ -275,21 +267,23 @@ function updateStartVisibility(){
 
 $("autoFill").onclick = ()=>{
   my.board = shuffle(Array.from({length:25},(_,i)=>i+1));
-  buildBoardInputs(my.board,true);
+  buildBoardInputs(my.board, true);
   show("readyBtn");
 };
 $("manualFill").onclick = ()=>{
-  buildBoardInputs(Array(25).fill(""),false);
+  buildBoardInputs(Array(25).fill(""), false); // ✅ blank circles
   show("readyBtn");
 };
 
 function buildBoardInputs(vals, locked){
   const host = $("boardBuilder"); host.innerHTML = "";
-  vals.forEach((v,i)=>{
+  vals.forEach((v)=>{
     const cell = document.createElement("div"); cell.className="cell";
-    if(locked){ cell.textContent = v; }
-    else{
-      const input = document.createElement("input"); input.type="text"; input.maxLength=2; input.placeholder=String(i+1);
+    if(locked){
+      cell.textContent = v;
+    }else{
+      const input = document.createElement("input");
+      input.type="text"; input.maxLength=2; input.placeholder=""; /* no background numbers */
       input.oninput = ()=>{ input.value = input.value.replace(/[^0-9]/g,""); };
       cell.appendChild(input);
     }
@@ -317,6 +311,7 @@ $("startBtn").onclick = async ()=>{
   await db.ref(`rooms/${my.room}/numbers/struck`).set(null);
   await db.ref(`rooms/${my.room}/winners`).set(null);
   await db.ref(`rooms/${my.room}/nextRank`).set(1);
+  await db.ref(`rooms/${my.room}/gameOver`).set(false);
   await db.ref(`rooms/${my.room}/started`).set(true);
   await db.ref(`rooms/${my.room}/currentTurn`).set(0);
 };
@@ -332,14 +327,18 @@ function startGameUI(){
     const pid = order[currentTurnIndex] || "";
     $("turnName").textContent = players[pid]?.nickname || "-";
   });
-  db.ref(`rooms/${my.room}/numbers/struck`).on("value", s=>{
+  db.ref(`rooms/${my.room}/numbers/struck`).on("value", async s=>{
     numbersStruck = s.val() || {};
     paintBoard();
-    updateMyBingo();
+    await autoCheckWinFromUpdate();      // ✅ if someone’s click gives me BINGO, I rank immediately
   });
   db.ref(`rooms/${my.room}/winners`).on("value", s=>{
     winnersObj = s.val() || {};
     renderWinners();
+  });
+  db.ref(`rooms/${my.room}/gameOver`).on("value", s=>{
+    gameOver = !!s.val();
+    if(gameOver){ disableBoard(); }
   });
 }
 
@@ -362,39 +361,16 @@ function paintBoard(){
     if(striker){
       const color = players[striker]?.color || "#999";
       c.classList.add("struck");
-      c.style.background = toRGBA(color, 0.28);      /* lighter fill */
-      c.style.borderColor = color;                   /* thin colored ring */
+      c.style.background = toRGBA(color, 0.28);  /* lighter fill */
+      c.style.borderColor = color;               /* thin colored ring */
     }else{
       c.classList.remove("struck");
       c.style.background = "#fff";
       c.style.borderColor = "#d1d5db";
     }
   });
-}
 
-async function tryStrike(num){
-  const myIndex = order.indexOf(my.pid);
-  if(myIndex !== currentTurnIndex) return alert("Not your turn!");
-
-  const ref = db.ref(`rooms/${my.room}/numbers/struck/${num}`);
-  let assigned = false;
-  await ref.transaction(current=>{
-    if(current) return current;     // already taken
-    assigned = true;
-    return my.pid;
-  });
-  if(!assigned) return; // someone else beat you
-
-  // advance turn
-  const next = (currentTurnIndex + 1) % order.length;
-  await db.ref(`rooms/${my.room}/currentTurn`).set(next);
-
-  // if this made me win, rank me
-  await maybeAssignRank();
-}
-
-/* BINGO banner update for me */
-function updateMyBingo(){
+  // update my banner letters
   const struck = new Set(Object.keys(numbersStruck).map(n=>parseInt(n,10)));
   const lines = linesFromBoard(my.board);
   let done = 0; lines.forEach(line=>{ if(line.every(n=>struck.has(n))) done++; });
@@ -402,38 +378,97 @@ function updateMyBingo(){
   db.ref(`rooms/${my.room}/players/${my.pid}/bingoCount`).set(done);
 }
 
-/* Transactional, idempotent ranking */
-async function maybeAssignRank(){
-  // if I'm already finished, bail
-  const meSnap = await db.ref(`rooms/${my.room}/players/${my.pid}`).get();
-  const me = meSnap.val();
-  if(me?.finished) return;
+function disableBoard(){
+  Array.from($("gameBoard").children).forEach(c=>c.onclick=null);
+}
 
-  // check lines >=5
+/* skip finished players when advancing turn */
+async function advanceTurn(){
+  let idx = currentTurnIndex;
+  const total = order.length;
+  for(let tries=0; tries<total; tries++){
+    idx = (idx+1) % total;
+    const pid = order[idx];
+    const pSnap = await db.ref(`rooms/${my.room}/players/${pid}/finished`).get();
+    if(!pSnap.val()) { await db.ref(`rooms/${my.room}/currentTurn`).set(idx); return; }
+  }
+  // everyone finished → end game
+  await db.ref(`rooms/${my.room}/gameOver`).set(true);
+}
+
+async function tryStrike(num){
+  if(gameOver) return;
+  const myIndex = order.indexOf(my.pid);
+  // do not allow if I’m finished
+  const meFinishedSnap = await db.ref(`rooms/${my.room}/players/${my.pid}/finished`).get();
+  if(meFinishedSnap.val()) return;
+  if(myIndex !== currentTurnIndex) return alert("Not your turn!");
+
+  const ref = db.ref(`rooms/${my.room}/numbers/struck/${num}`);
+  let assigned = false;
+  await ref.transaction(current=>{
+    if(current) return current;
+    assigned = true;
+    return my.pid;
+  });
+  if(!assigned) return;
+
+  await handlePostStrikeLogic();
+}
+
+async function handlePostStrikeLogic(){
+  // after a click, check wins for *everyone* via each client self-checking on update
+  // first advance turn, skipping finished players
+  await advanceTurn();
+}
+
+async function autoCheckWinFromUpdate(){
+  if(gameOver) return;
+
+  // compute my completion status on every numbers change
   const struck = new Set(Object.keys(numbersStruck).map(n=>parseInt(n,10)));
   const lines = linesFromBoard(my.board);
   let done = 0; lines.forEach(line=>{ if(line.every(n=>struck.has(n))) done++; });
-  if(done < 5) return;
 
-  // claim a rank exactly once
-  const rankRef = db.ref(`rooms/${my.room}/nextRank`);
-  let assigned;
-  await rankRef.transaction(cur=>{
-    cur = cur || 1;
-    assigned = cur;
-    return cur + 1;
-  });
+  const meRef = db.ref(`rooms/${my.room}/players/${my.pid}`);
+  const meSnap = await meRef.get();
+  const me = meSnap.val() || {};
+  if(me.finished) return;
 
-  // Double-check if someone already set my rank between reads
-  const check = await db.ref(`rooms/${my.room}/players/${my.pid}/rank`).get();
-  if(check.exists()) return; // already set (idempotent guard)
+  if(done >= 5){
+    // assign rank once (idempotent)
+    const rankRef = db.ref(`rooms/${my.room}/nextRank`);
+    let assigned;
+    await rankRef.transaction(cur => {
+      cur = cur || 1;
+      assigned = cur;
+      return cur + 1;
+    });
+    const existingRankSnap = await db.ref(`rooms/${my.room}/players/${my.pid}/rank`).get();
+    if(!existingRankSnap.exists()){
+      await db.ref(`rooms/${my.room}/players/${my.pid}`).update({ rank: assigned, finished: true });
+      await db.ref(`rooms/${my.room}/winners/${my.pid}`).set({ name: my.name, rank: assigned });
+    }
 
-  await db.ref(`rooms/${my.room}/players/${my.pid}`).update({ rank: assigned, finished: true });
+    // game end rule:
+    const totalPlayers = order.length;
+    if(totalPlayers === 2){
+      // first winner ends the game for both
+      await db.ref(`rooms/${my.room}/gameOver`).set(true);
+      return;
+    }
+  }
 
-  // winners as an object keyed by pid → no duplicates
-  await db.ref(`rooms/${my.room}/winners/${my.pid}`).set({ name: my.name, rank: assigned });
+  // if all (or all but one) finished, end automatically
+  const playersSnap = await db.ref(`rooms/${my.room}/players`).get();
+  const data = playersSnap.val() || {};
+  const finishedCount = Object.values(data).filter(p=>p.finished).length;
+  if(finishedCount === Object.keys(data).length){
+    await db.ref(`rooms/${my.room}/gameOver`).set(true);
+  }
 }
 
+/* winners list */
 function renderWinners(){
   const box = $("winnersBox");
   const list = $("winnerList"); list.innerHTML = "";
