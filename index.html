@@ -45,9 +45,41 @@
   .winners{border:1px solid var(--line2);border-radius:10px;padding:10px 12px;background:#fff}
   .glow{box-shadow:0 0 0 0 rgba(37,99,235,.6);animation:glow 1.2s ease-in-out infinite}
   @keyframes glow{50%{box-shadow:0 0 0 12px rgba(37,99,235,0)}}
+
+  /* Winner toast + confetti */
+  .toast{
+    position:fixed; top:-200px; left:0; right:0; z-index:9999;
+    display:flex; justify-content:center; pointer-events:none;
+  }
+  .toast-inner{
+    background:#ffffff; border:1px solid var(--line2); border-radius:12px;
+    padding:12px 16px; margin-top:12px; box-shadow:0 12px 30px rgba(0,0,0,.12);
+    font-weight:800; color:#111; display:flex; align-items:center; gap:10px;
+  }
+  .toast.show{animation:slideDown .5s ease forwards}
+  .toast.hide{animation:slideUp .4s ease forwards}
+  @keyframes slideDown{from{top:-200px;opacity:.2}to{top:0;opacity:1}}
+  @keyframes slideUp{from{top:0;opacity:1}to{top:-200px;opacity:0}}
+
+  .confetti{
+    position:fixed; top:-20px; left:0; width:100%; height:0; pointer-events:none; overflow:visible; z-index:9998;
+  }
+  .confetti i{
+    position:absolute; top:-20px; width:8px; height:12px; opacity:.95; transform:rotate(0deg);
+    animation:fall 1.6s linear forwards;
+    border-radius:2px;
+  }
+  @keyframes fall{
+    to{ transform:translateY(220px) rotate(180deg); opacity:.9; }
+  }
 </style>
 </head>
 <body>
+<div class="toast" id="toast">
+  <div class="toast-inner" id="toastText">🎉 Player won!</div>
+</div>
+<div class="confetti" id="confetti"></div>
+
 <div class="wrap">
   <div class="card">
 
@@ -155,14 +187,13 @@
 <script>
 /* ============ 1) Firebase Config (replace) ============ */
 const firebaseConfig = {
-  apiKey: "AIzaSyDY9AUUyco-stWWr3HxZ4VYDASN5JQHlAY",
-  authDomain: "bingogame-ea6c9.firebaseapp.com",
-  databaseURL: "https://bingogame-ea6c9-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "bingogame-ea6c9",
-  storageBucket: "bingogame-ea6c9.firebasestorage.app",
-  messagingSenderId: "553263162615",
-  appId: "1:553263162615:web:b20e3feb6d282a3f3b9ff2",
-  measurementId: "G-ED0490QCMN"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
@@ -176,6 +207,7 @@ let numbersStruck = {};       // num -> pid
 let currentTurnIndex = 0;
 let winnersObj = {};          // pid -> {name,rank}
 let gameOver = false;
+let seenWinnerPids = new Set(); // toasts only once per winner
 
 /* ============ 3) Helpers ============ */
 const $ = id => document.getElementById(id);
@@ -194,7 +226,33 @@ function linesFromBoard(b){
   const cols = [0,1,2,3,4].map(c=>[b[c],b[c+5],b[c+10],b[c+15],b[c+20]]);
   const d1 = [b[0],b[6],b[12],b[18],b[24]];
   const d2 = [b[4],b[8],b[12],b[16],b[20]];
-  return [...rows, ...cols, d1, d2]; // ✅ includes diagonals
+  return [...rows, ...cols, d1, d2];
+}
+
+/* ===== winner toast & confetti ===== */
+function showWinnerToast(text){
+  const toast = $("toast");
+  const tx = $("toastText");
+  tx.textContent = text;
+  toast.classList.remove("hide");
+  toast.classList.add("show");
+  makeConfetti();
+  setTimeout(()=>{
+    toast.classList.remove("show");
+    toast.classList.add("hide");
+  }, 2200);
+}
+function makeConfetti(){
+  const c = $("confetti"); c.innerHTML = "";
+  const colors = ["#ef4444","#f59e0b","#10b981","#3b82f6","#a855f7","#22d3ee"];
+  for(let i=0;i<60;i++){
+    const piece = document.createElement("i");
+    piece.style.left = Math.random()*100 + "%";
+    piece.style.background = colors[i%colors.length];
+    piece.style.animationDelay = (Math.random()*0.6)+"s";
+    piece.style.transform = `translateY(0) rotate(${Math.random()*180}deg)`;
+    c.appendChild(piece);
+  }
 }
 
 /* ============ 4) UI Nav ============ */
@@ -271,7 +329,7 @@ $("autoFill").onclick = ()=>{
   show("readyBtn");
 };
 $("manualFill").onclick = ()=>{
-  buildBoardInputs(Array(25).fill(""), false); // ✅ blank circles
+  buildBoardInputs(Array(25).fill(""), false); // blank circles
   show("readyBtn");
 };
 
@@ -283,7 +341,7 @@ function buildBoardInputs(vals, locked){
       cell.textContent = v;
     }else{
       const input = document.createElement("input");
-      input.type="text"; input.maxLength=2; input.placeholder=""; /* no background numbers */
+      input.type="text"; input.maxLength=2; input.placeholder="";
       input.oninput = ()=>{ input.value = input.value.replace(/[^0-9]/g,""); };
       cell.appendChild(input);
     }
@@ -330,11 +388,29 @@ function startGameUI(){
   db.ref(`rooms/${my.room}/numbers/struck`).on("value", async s=>{
     numbersStruck = s.val() || {};
     paintBoard();
-    await autoCheckWinFromUpdate();      // ✅ if someone’s click gives me BINGO, I rank immediately
+    await autoCheckWinFromUpdate();      // if someone else’s click wins me, rank me now
   });
   db.ref(`rooms/${my.room}/winners`).on("value", s=>{
+    const before = new Set(Object.keys(winnersObj||{}));
     winnersObj = s.val() || {};
     renderWinners();
+
+    // detect new winners to toast
+    const after = new Set(Object.keys(winnersObj));
+    for(const pid of after){
+      if(!before.has(pid) && !seenWinnerPids.has(pid)){
+        const w = winnersObj[pid];
+        const name = (players[pid]?.nickname || w.name || "A player");
+        showWinnerToast(`🎉 ${name} got BINGO! Rank ${w.rank}`);
+        seenWinnerPids.add(pid);
+      }
+    }
+
+    // if exactly 2 players and at least 1 winner → end and scroll
+    if(order.length === 2 && Object.keys(winnersObj).length >= 1){
+      db.ref(`rooms/${my.room}/gameOver`).set(true);
+      setTimeout(()=>{ document.getElementById("winnersBox").scrollIntoView({behavior:"smooth", block:"start"}); }, 800);
+    }
   });
   db.ref(`rooms/${my.room}/gameOver`).on("value", s=>{
     gameOver = !!s.val();
@@ -361,8 +437,8 @@ function paintBoard(){
     if(striker){
       const color = players[striker]?.color || "#999";
       c.classList.add("struck");
-      c.style.background = toRGBA(color, 0.28);  /* lighter fill */
-      c.style.borderColor = color;               /* thin colored ring */
+      c.style.background = toRGBA(color, 0.28);
+      c.style.borderColor = color;
     }else{
       c.classList.remove("struck");
       c.style.background = "#fff";
@@ -399,7 +475,6 @@ async function advanceTurn(){
 async function tryStrike(num){
   if(gameOver) return;
   const myIndex = order.indexOf(my.pid);
-  // do not allow if I’m finished
   const meFinishedSnap = await db.ref(`rooms/${my.room}/players/${my.pid}/finished`).get();
   if(meFinishedSnap.val()) return;
   if(myIndex !== currentTurnIndex) return alert("Not your turn!");
@@ -417,15 +492,12 @@ async function tryStrike(num){
 }
 
 async function handlePostStrikeLogic(){
-  // after a click, check wins for *everyone* via each client self-checking on update
-  // first advance turn, skipping finished players
   await advanceTurn();
 }
 
 async function autoCheckWinFromUpdate(){
   if(gameOver) return;
 
-  // compute my completion status on every numbers change
   const struck = new Set(Object.keys(numbersStruck).map(n=>parseInt(n,10)));
   const lines = linesFromBoard(my.board);
   let done = 0; lines.forEach(line=>{ if(line.every(n=>struck.has(n))) done++; });
@@ -436,30 +508,25 @@ async function autoCheckWinFromUpdate(){
   if(me.finished) return;
 
   if(done >= 5){
-    // assign rank once (idempotent)
+    // transactional, idempotent ranking
     const rankRef = db.ref(`rooms/${my.room}/nextRank`);
     let assigned;
-    await rankRef.transaction(cur => {
-      cur = cur || 1;
-      assigned = cur;
-      return cur + 1;
-    });
+    await rankRef.transaction(cur => { cur = cur || 1; assigned = cur; return cur + 1; });
+
     const existingRankSnap = await db.ref(`rooms/${my.room}/players/${my.pid}/rank`).get();
     if(!existingRankSnap.exists()){
       await db.ref(`rooms/${my.room}/players/${my.pid}`).update({ rank: assigned, finished: true });
       await db.ref(`rooms/${my.room}/winners/${my.pid}`).set({ name: my.name, rank: assigned });
     }
 
-    // game end rule:
-    const totalPlayers = order.length;
-    if(totalPlayers === 2){
-      // first winner ends the game for both
+    // if exactly 2 players → end game and scroll
+    if(order.length === 2){
       await db.ref(`rooms/${my.room}/gameOver`).set(true);
-      return;
+      setTimeout(()=>{ document.getElementById("winnersBox").scrollIntoView({behavior:"smooth", block:"start"}); }, 800);
     }
   }
 
-  // if all (or all but one) finished, end automatically
+  // end if all finished
   const playersSnap = await db.ref(`rooms/${my.room}/players`).get();
   const data = playersSnap.val() || {};
   const finishedCount = Object.values(data).filter(p=>p.finished).length;
